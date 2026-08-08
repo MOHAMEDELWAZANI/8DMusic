@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=8D Music
+GenericName=Spatial Audio Effect
+Comment=Apply a real-time 8D spatial effect to all system audio
+Exec=bash -c "$HOME/Projects/8DMUSIC/run.sh"
+Path=/home/mohamedwazane/Projects/8DMUSIC
+Icon=/home/mohamedwazane/Projects/8DMUSIC/eight_d/assets/icon-256.png
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+Keywords=8d;audio;spatial;surround;headphones;
+StartupNotify=true

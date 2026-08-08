@@ -27,6 +27,16 @@ TWO_PI = 2.0 * math.pi
 #: Maximum interaural time difference in seconds (~ head radius / speed of sound).
 ITD_MAX_S = 0.00070
 
+#: Silence gate.  Two thresholds so a signal hovering at the boundary cannot
+#: chatter, and a hold long enough to ride out the gaps between tracks.
+GATE_OPEN = 3.0e-4      # about -70 dBFS peak
+GATE_CLOSE = 1.0e-4     # about -80 dBFS peak
+GATE_HOLD_S = 0.7       # long enough to ride out a gap between tracks
+#: Movement picks up almost at once but coasts to a stop, so the orbit is
+#: already travelling on the first beat and does not jerk to a halt at the end.
+MOTION_ATTACK = 0.08
+MOTION_RELEASE = 0.25
+
 MODES = (
     "circular",
     "pingpong",
@@ -76,6 +86,7 @@ class Params:
     width: float = 1.0         # stereo width of the source material, 0..2
     direction: int = 1         # +1 clockwise, -1 counter-clockwise
     manual_angle: float = 0.0  # used by the "static" mode, radians
+    pause_when_silent: bool = True   # park the orbit while nothing is playing
 
     character: str = "clean"        # tone applied before the spatialiser
     character_amount: float = 1.0   # how strongly, 0..1
@@ -488,19 +499,27 @@ class Orbit:
         self.radius = self.radius_smooth = 1.0
         self._omega = 0.0
 
-    def step(self, frames: int, p: Params) -> tuple[float, float, float, float]:
-        """Advance by `frames` samples, returning (theta0, theta1, r0, r1)."""
+    def step(self, frames: int, p: Params,
+             motion: float = 1.0) -> tuple[float, float, float, float]:
+        """Advance by `frames` samples, returning (theta0, theta1, r0, r1).
+
+        `motion` scales how much of that time the trajectory actually travels,
+        so the caller can park the source while nothing is playing.  Smoothing
+        still runs on real time, so a parked orbit settles onto its target
+        instead of freezing part-way through an interpolation.
+        """
         dt = frames / self.rate
+        move = dt * min(max(motion, 0.0), 1.0)
         theta_prev = self.theta_smooth
         radius_prev = self.radius_smooth
 
         direction = 1.0 if p.direction >= 0 else -1.0
-        self.phase = (self.phase + p.speed * dt) % 1.0
+        self.phase = (self.phase + p.speed * move) % 1.0
         ph = self.phase * TWO_PI
         radius = p.radius
 
         if p.mode == "circular":
-            self.theta += direction * TWO_PI * p.speed * dt
+            self.theta += direction * TWO_PI * p.speed * move
         elif p.mode == "pingpong":
             # Triangle wave: constant speed across the field, hard turnarounds.
             tri = 4.0 * abs(self.phase - 0.5) - 1.0
@@ -514,14 +533,14 @@ class Orbit:
             self.theta = direction * (math.pi / 2.0) * math.sin(ph)
             radius = p.radius * (0.45 + 0.55 * abs(math.cos(ph)))
         elif p.mode == "spiral":
-            self.theta += direction * TWO_PI * p.speed * dt
+            self.theta += direction * TWO_PI * p.speed * move
             radius = p.radius * (0.4 + 0.6 * (0.5 + 0.5 * math.sin(ph / 3.0)))
         elif p.mode == "random":
             # Ornstein-Uhlenbeck angular velocity: wanders without ever jumping.
             target = self._rng.normal(0.0, TWO_PI * p.speed)
-            k = 1.0 - math.exp(-dt / 0.9)
+            k = 1.0 - math.exp(-move / 0.9)
             self._omega += (target - self._omega) * k
-            self.theta += direction * self._omega * dt
+            self.theta += direction * self._omega * move
         else:  # static
             self.theta = p.manual_angle
 
@@ -564,6 +583,9 @@ class EightDProcessor:
         self._echo_time = 0.28
         self._limiter_gain = 1.0
         self._last_air_cut = -1.0
+        self._quiet_for = GATE_HOLD_S
+        self.playing = False        # is anything coming in?
+        self.motion = 0.0           # 0 parked .. 1 travelling
 
         # Published for the UI's orbit visualiser.
         self.angle = 0.0
@@ -578,6 +600,9 @@ class EightDProcessor:
         self.reverb.reset()
         self.pitch.reset()
         self.radio.reset()
+        self._quiet_for = GATE_HOLD_S
+        self.playing = False
+        self.motion = 0.0
         self.shadow_lp.reset()
         self.rear_lp.reset()
         self.air_lp.reset()
@@ -588,6 +613,34 @@ class EightDProcessor:
     @staticmethod
     def _ramp(a: float, b: float, n: int) -> np.ndarray:
         return np.linspace(a, b, n, endpoint=False, dtype=np.float32)
+
+    def _gate(self, x: np.ndarray, p: Params) -> float:
+        """How much the orbit should travel this block, 0..1.
+
+        Nothing playing means nothing to place, so the source parks where it is
+        rather than circling an empty room.  The two thresholds stop a signal
+        sitting on the boundary from chattering, and the hold rides out the gap
+        between tracks; the result is eased so the orbit coasts to a stop.
+        """
+        n = x.shape[0]
+        dt = n / self.rate
+        level = float(np.abs(x).max()) if n else 0.0
+
+        if level >= GATE_OPEN:
+            self._quiet_for = 0.0
+            self.playing = True
+        elif level < GATE_CLOSE:
+            self._quiet_for += dt
+            if self._quiet_for >= GATE_HOLD_S:
+                self.playing = False
+        # between the two thresholds the previous verdict stands
+
+        target = 1.0 if (self.playing or not p.pause_when_silent) else 0.0
+        tau = MOTION_ATTACK if target > self.motion else MOTION_RELEASE
+        self.motion += (target - self.motion) * (1.0 - math.exp(-dt / tau))
+        if self.motion < 1e-3:
+            self.motion = 0.0       # otherwise it creeps forever
+        return self.motion
 
     # -- main -------------------------------------------------------------
 
@@ -602,7 +655,7 @@ class EightDProcessor:
             self.pitch = PitchDown(self.rate, n)
             self.radio = RadioTone(self.rate, n)
 
-        theta0, theta1, r0, r1 = self.orbit.step(n, p)
+        theta0, theta1, r0, r1 = self.orbit.step(n, p, self._gate(x, p))
         self.angle = theta1
         self.distance = r1
 

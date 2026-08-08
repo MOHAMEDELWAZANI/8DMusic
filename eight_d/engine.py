@@ -93,6 +93,11 @@ class AudioEngine:
     def levels(self) -> tuple[float, float]:
         return self.processor.peak_l, self.processor.peak_r
 
+    @property
+    def moving(self) -> bool:
+        """False while the orbit is parked because nothing is playing."""
+        return self.processor.motion > 0.05
+
     # -- lifecycle --------------------------------------------------------
 
     def start(self, output_sink: str, latency_ms: int = 25) -> None:

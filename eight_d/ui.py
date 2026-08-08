@@ -620,6 +620,7 @@ class OrbitStage(tk.Canvas):
         self.peak_l = self.peak_r = 0.0
         self.active_preset: str | None = None
         self.state_label = "Ready"
+        self.travelling = True
         self.status_text = ""
         self.status_tone = "info"
         self._pulse = 0.0
@@ -830,9 +831,11 @@ class OrbitStage(tk.Canvas):
         x = px(self.MARGIN_X)
         y = getattr(self, "_state_y", px(self.TOP + 110))
         colour = C["MOTION"] if running else C["INK_GHOST"]
-        if running:
+        if running and self.travelling:
             alpha = 0.5 + 0.5 * abs(math.sin(self._pulse * math.pi))
             colour = _mix(C["MOTION"], C["GROUND"], alpha)
+        elif running:
+            colour = _mix(C["MOTION"], C["GROUND"], 0.45)   # parked, not dead
         dot = px(4)
         self.create_oval(x, y - dot, x + dot * 2, y + dot,
                          fill=colour, outline="", tags="live")
@@ -1185,7 +1188,12 @@ class App(tk.Tk):
         self.s_angle = self._slider(
             move, "Manual position", -180, 180, 0.0, self.on_angle,
             fmt=lambda v: f"{v:+.0f}°", hint="Used by the Static position mode")
-        self.s_angle.pack(fill="x")
+        self.s_angle.pack(fill="x", pady=(0, px(13)))
+
+        self.pause_silent = CheckBox(move, "Pause the orbit when nothing plays",
+                                     self.on_pause_silent, fonts["field"])
+        self.pause_silent.pack(fill="x")
+        self._themed.append(self.pause_silent)
 
         # ---- character -------------------------------------------------------
         tone = self._block(rail, "Character", (22, 0))
@@ -1313,6 +1321,9 @@ class App(tk.Tk):
     def on_bypass(self):
         self.engine.update(enabled=not self.bypass.get())
 
+    def on_pause_silent(self):
+        self.engine.update(pause_when_silent=self.pause_silent.get())
+
     def toggle_bypass(self):
         self.bypass.set(not self.bypass.get())
         self.on_bypass()
@@ -1350,6 +1361,7 @@ class App(tk.Tk):
                                                     CHARACTER_LABELS["clean"]))
         self.s_character.set(p.character_amount)
         self.bypass.set(not p.enabled)
+        self.pause_silent.set(p.pause_when_silent)
         self._update_mode_dependent(p.mode)
         self._update_character_dependent(p.character)
 
@@ -1419,6 +1431,12 @@ class App(tk.Tk):
     def _tick(self):
         status = self.engine.status
         running = status.running
+        if running:
+            # Say why the orbit has stopped, or it reads as a hang.
+            self.stage.travelling = self.engine.moving
+            self.stage.state_label = ("Processing system audio"
+                                      if self.stage.travelling
+                                      else "Silent — orbit parked")
         self.stage.refresh(self.engine.angle, self.engine.distance, running,
                            self.engine.levels(), status.load)
 

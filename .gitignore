@@ -4,7 +4,7 @@ __pycache__/
 *.egg-info/
 build/
 dist/
-
+tools/
 # The virtualenv run.sh creates on first launch
 .venv/
 
@@ -22,3 +22,4 @@ dist/
 # Scratch
 *.tmp
 *.xwd
+

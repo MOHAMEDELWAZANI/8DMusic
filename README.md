@@ -72,6 +72,59 @@ real source would produce:
 Delay times and pan gains are interpolated per sample, so nothing clicks or
 zippers while you move the controls.
 
+## Now playing
+
+The top of the rail shows what you are actually listening to — title, artists,
+elapsed time — with skip and play/pause that drive the player itself, not the
+effect. Nothing has to be configured, and nothing leaves the machine.
+
+Two sources feed it:
+
+| Source | What it gives |
+| --- | --- |
+| **MPRIS** | Players publish their track on the session bus. Exact title, artists, length, position and working transport. Spotify, Firefox, Chrome/Brave, VLC, mpv and Rhythmbox all speak it. |
+| **PipeWire** | The playback node's own props, used when a player never registered on the bus. Coarser — usually just the app name. |
+
+Titles are tidied on the way in, because uploaders put far more than the song
+name in them: `Eminem - Love The Way You Lie ft. Rihanna` from a `- Topic`
+channel becomes **Love The Way You Lie** by **Eminem · Rihanna**.
+
+The cover is a lettered tile rather than the real artwork, which players cache
+in formats Tk cannot read. Two artists give their initials — Eminem and Rihanna
+make `Er` — and one artist gives its opening pair, so Eminem alone makes `Em`.
+
+### Arabic
+
+Tk paints a string as a plain left-to-right run of code points. It has no
+bidirectional algorithm and no OpenType shaping, so Arabic arrives backwards and
+with every letter standing alone. `bidi.py` does both jobs before the text
+reaches a widget: it swaps each letter for the contextual form its neighbours
+call for, fuses lam-alef into its single glyph, and reorders the line into the
+order it should be painted — keeping digits running left to right inside it.
+
+The letter forms are read out of `unicodedata` rather than a table pasted into
+the source, so they are whatever the installed Unicode data says. The reordering
+covers the everyday cases of UAX #9; it is not a conformant implementation and
+does not need to be for a one-line label.
+
+Each line is then set in the face that suits its script, since neither bundled
+font covers the other's alphabet:
+
+| Script | Face |
+| --- | --- |
+| Arabic | KO Methlama, from [arfonts.net](https://arfonts.net) |
+| Everything else | OffBit 101 Bold |
+
+Sizes are matched by **ascent** rather than nominal size — KO Methlama carries a
+far larger line gap than OffBit, so equal numbers would draw wildly unequal
+letters — and each row's height is pinned to the taller of the two, so switching
+between an Arabic and a Latin track cannot resize the panel.
+
+`Spotify · captured` on the right means that player's audio is confirmed to be
+flowing through the virtual sink, read from the actual PipeWire links rather
+than from what the stream was merely *asked* to do. Without the word, something
+is playing but not passing through the effect.
+
 ## Controls
 
 | Control | What it does |
@@ -154,6 +207,13 @@ actually listen through, not at "8D Music" itself.
 The engine re-checks every two seconds and pulls them in; if one refuses, set its
 output to *8D Music* in your system sound settings.
 
+**"Nothing playing" while music is clearly playing.** Either the player does not
+speak MPRIS, or it is confined by a snap or flatpak and is refusing us. A
+confined player only answers callers whose AppArmor label it recognises, and
+launching 8D Music from an IDE's embedded terminal is enough to fail that check
+— start it from `./run.sh` in a normal terminal, or from the app menu. `busctl`
+must also be installed; without it only the PipeWire fallback runs.
+
 **Crackling or dropouts.** Set **Latency** to *Safe*. The status line shows the
 CPU cost per block — sustained readings near 100% mean the machine can't keep up.
 
@@ -168,12 +228,44 @@ eight_d/
   dsp.py        the spatial engine — orbit paths, ITD/ILD, head shadow, delay, reverb
   engine.py     the real-time thread and the pw-record → DSP → pw-play pipeline
   pipewire.py   virtual sink creation, stream routing, restoring things afterwards
+  nowplaying.py track detection over MPRIS, with a PipeWire fallback
+  bidi.py       Arabic shaping and right-to-left reordering, which Tk lacks
+  fonts.py      makes the bundled faces visible to Tk, without installing them
   ui.py         the desktop interface and orbit visualiser
   config.py     settings persistence (~/.config/8dmusic/settings.json)
   assets/       app icons and the logo lockup
+  assets/fonts/ the two bundled faces
 tools/
-  make_icons.py regenerates everything in assets/ from the logo geometry
+  make_icons.py       regenerates everything in assets/ from the logo geometry
+  make_arabic_font.py rebuilds the bundled Arabic face (see below)
 ```
+
+### The bundled Arabic face
+
+An Arabic font keeps one glyph per letter *shape* and an OpenType engine picks
+between them while laying the line out. Tk has no such engine — it can only look
+a character up in the font's `cmap` — so it can never reach the joined shapes,
+and KO Methlama maps none of them.
+
+`tools/make_arabic_font.py` reads the substitutions out of the font's own GSUB
+table and writes `cmap` entries pointing at the glyphs the designer already
+drew, making them addressable by code point. No outline is touched and nothing
+is redrawn; the result is the same font with a fuller index, renamed so it can
+never be confused with the original. It only needs re-running if the source font
+changes:
+
+```bash
+.venv/bin/pip install fonttools
+.venv/bin/python tools/make_arabic_font.py
+```
+
+fontTools is a tool-time dependency only — the app itself never imports it.
+
+Both faces are reached through a generated fontconfig file that includes the
+system configuration and adds `assets/fonts/`. Nothing is written to your font
+directories and nothing is registered system-wide. If any of that is unavailable
+the interface quietly falls back to the fonts the system already has, and the
+right-to-left fix still applies.
 
 ## Identity
 

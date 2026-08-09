@@ -46,6 +46,9 @@ class Stream:
     serial: int
     name: str
     app: str
+    pid: int = -1
+    title: str = ""      # only a handful of players fill these in
+    artist: str = ""
 
 
 def missing_tools() -> list[str]:
@@ -105,15 +108,44 @@ def list_output_streams(objects: list[dict] | None = None) -> list[Stream]:
         # sink would feed our output straight back into our input.
         if name.startswith(NODE_PREFIX):
             continue
+        try:
+            pid = int(p.get("application.process.id", -1))
+        except (TypeError, ValueError):
+            pid = -1
         streams.append(
             Stream(
                 id=int(obj.get("id", -1)),
                 serial=int(p.get("object.serial", -1)),
                 name=name,
                 app=p.get("application.name") or p.get("media.name") or name,
+                pid=pid,
+                title=p.get("media.title") or "",
+                artist=p.get("media.artist") or "",
             )
         )
     return streams
+
+
+def streams_into(sink_id: int | None, objects: list[dict] | None = None) -> set[int]:
+    """Ids of the stream nodes currently linked into `sink_id`.
+
+    A stream's `target.object` says where it was *asked* to go; the links say
+    where its audio is actually arriving, which is what "captured" has to mean.
+    """
+    if sink_id is None:
+        return set()
+    linked: set[int] = set()
+    for obj in objects if objects is not None else dump():
+        if not str(obj.get("type", "")).endswith("Link"):
+            continue
+        p = _props(obj)
+        if p.get("link.input.node") != sink_id:
+            continue
+        try:
+            linked.add(int(p["link.output.node"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return linked
 
 
 def default_sink_name() -> str | None:

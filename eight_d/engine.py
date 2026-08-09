@@ -98,6 +98,11 @@ class AudioEngine:
         """False while the orbit is parked because nothing is playing."""
         return self.processor.motion > 0.05
 
+    @property
+    def sink_id(self) -> int | None:
+        """Node id of the virtual sink, so callers can see what feeds it."""
+        return self._sink.id
+
     # -- lifecycle --------------------------------------------------------
 
     def start(self, output_sink: str, latency_ms: int = 25) -> None:

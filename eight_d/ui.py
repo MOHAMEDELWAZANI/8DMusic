@@ -15,12 +15,13 @@ from __future__ import annotations
 
 import math
 import subprocess
+import time
 import tkinter as tk
 import tkinter.font as tkfont
 from collections import deque
 from pathlib import Path
 
-from . import config, pipewire as pw
+from . import bidi, config, fonts as bundled, nowplaying, pipewire as pw
 from .dsp import (CHARACTER_LABELS, CHARACTERS, MODE_LABELS, MODES, PRESETS,
                   Params)
 from .engine import DEFAULT_LATENCY, LATENCY_PROFILES, AudioEngine, describe_error
@@ -597,6 +598,411 @@ class Dropdown(tk.Frame):
 
 
 # --------------------------------------------------------------------------
+# now playing
+# --------------------------------------------------------------------------
+
+
+def _ellipsize(text: str, font, width: int, prepare=None) -> str:
+    """Trim `text` to `width` device pixels, since Tk labels never clip.
+
+    `prepare` turns logical text into what will actually be painted.  The search
+    runs over the logical string and measures the prepared form of each
+    candidate, because for Arabic the two are neither the same length nor in the
+    same order -- and cutting the logical tail is what correctly trims a
+    right-to-left line from its left-hand end.
+    """
+    prepare = prepare or (lambda s: s)
+    metrics = tkfont.Font(font=font)
+    if metrics.measure(prepare(text)) <= width:
+        return prepare(text)
+    lo, hi = 0, len(text)
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if metrics.measure(prepare(text[:mid] + "…")) <= width:
+            lo = mid
+        else:
+            hi = mid - 1
+    return prepare(text[:lo].rstrip() + "…")
+
+
+def _clock(seconds: float) -> str:
+    seconds = max(int(seconds), 0)
+    hours, rest = divmod(seconds, 3600)
+    minutes, secs = divmod(rest, 60)
+    return f"{hours}:{minutes:02d}:{secs:02d}" if hours else f"{minutes}:{secs:02d}"
+
+
+class CoverTile(tk.Canvas):
+    """A square mark standing in for the artwork, lettered from the artists.
+
+    Cover art would mean decoding whatever the player happened to cache -- Tk
+    reads PNG and GIF only -- so the initials are drawn instead.  They are
+    always available, always legible at this size, and follow the theme.
+    """
+
+    SIZE = 64
+
+    def __init__(self, master, font):
+        self._size = px(self.SIZE)
+        super().__init__(master, width=self._size, height=self._size,
+                         highlightthickness=0, bd=0)
+        self.font = font
+        self.text = "—"
+        self.active = False
+        self.retheme()
+
+    def set(self, text: str, active: bool, font=None):
+        font = font or self.font
+        if (text, active, font) == (self.text, self.active, self.font):
+            return
+        self.text, self.active, self.font = text, active, font
+        self._draw()
+
+    def retheme(self, font=None):
+        if font is not None:
+            self.font = font
+        self.configure(bg=C["RAIL"])
+        self._draw()
+
+    def _draw(self):
+        self.delete("all")
+        s = self._size
+        self.create_rectangle(0, 0, s, s, outline="",
+                              fill=C["INK"] if self.active else C["TRACK"])
+        self.create_text(s / 2, s / 2 + px(1), text=self.text, font=self.font,
+                         fill=C["GROUND"] if self.active else C["RAIL_GHOST"])
+
+
+class TransportButton(tk.Canvas):
+    """Skip and play/pause, drawn rather than typed.
+
+    The media control characters live in fonts most desktops do not ship, and a
+    missing glyph would show as a box, so the shapes are painted directly.
+    """
+
+    SIZE = 22
+
+    def __init__(self, master, glyph: str, command):
+        self._size = px(self.SIZE)
+        super().__init__(master, width=self._size, height=self._size,
+                         highlightthickness=0, bd=0)
+        self.glyph = glyph
+        self.command = command
+        self.enabled = False
+        self._over = False
+        self.bind("<Button-1>", self._click)
+        self.bind("<Enter>", lambda _: self._hover(True))
+        self.bind("<Leave>", lambda _: self._hover(False))
+        self.retheme()
+
+    def set_glyph(self, glyph: str):
+        if glyph != self.glyph:
+            self.glyph = glyph
+            self._draw()
+
+    def set_enabled(self, enabled: bool):
+        enabled = bool(enabled)
+        if enabled != self.enabled:
+            self.enabled = enabled
+            self.configure(cursor="hand2" if enabled else "")
+            self._draw()
+
+    def retheme(self):
+        self.configure(bg=C["RAIL"])
+        self._draw()
+
+    def _hover(self, over):
+        self._over = over
+        if self.enabled:
+            self._draw()
+
+    def _click(self, _event):
+        if self.enabled:
+            self.command()
+
+    def _draw(self):
+        self.delete("all")
+        s = self._size
+        if not self.enabled:
+            ink = C["RAIL_GHOST"]
+        else:
+            ink = C["ACCENT"] if self._over else C["RAIL_INK"]
+        box = lambda x0, y0, x1, y1: self.create_rectangle(  # noqa: E731
+            x0 * s, y0 * s, x1 * s, y1 * s, fill=ink, outline="")
+        wedge = lambda *pts: self.create_polygon(  # noqa: E731
+            *[p * s for p in pts], fill=ink, outline="")
+
+        if self.glyph == "prev":
+            box(0.15, 0.21, 0.24, 0.79)
+            wedge(0.85, 0.21, 0.85, 0.79, 0.29, 0.50)
+        elif self.glyph == "next":
+            wedge(0.15, 0.21, 0.15, 0.79, 0.71, 0.50)
+            box(0.76, 0.21, 0.85, 0.79)
+        elif self.glyph == "pause":
+            box(0.27, 0.18, 0.41, 0.82)
+            box(0.59, 0.18, 0.73, 0.82)
+        else:                                   # play
+            wedge(0.26, 0.16, 0.26, 0.84, 0.82, 0.50)
+
+
+class ProgressBar(tk.Canvas):
+    """The track position: same 3px rail as the sliders, in the motion colour."""
+
+    HEIGHT = 15
+
+    #: How long the handle keeps the position the user let go of.  The player
+    #: is not asked where it is until the next poll, and without this the bar
+    #: would snap back to the old reading for a moment.
+    HOLD = 0.6
+
+    def __init__(self, master, on_seek):
+        self._height = px(self.HEIGHT)
+        super().__init__(master, height=self._height, highlightthickness=0, bd=0)
+        self.on_seek = on_seek
+        self.fraction = 0.0
+        self.seekable = False
+        self._dragging = False
+        self._hold_until = 0.0
+        self.bind("<Button-1>", self._drag)
+        self.bind("<B1-Motion>", self._drag)
+        self.bind("<ButtonRelease-1>", self._release)
+        self.bind("<Configure>", lambda _: self._draw())
+        self.retheme()
+
+    def set(self, fraction: float, seekable: bool):
+        if seekable != self.seekable:
+            self.seekable = seekable
+            self.configure(cursor="hand2" if seekable else "")
+        # Never move the handle out from under the hand holding it.
+        if self._dragging or time.monotonic() < self._hold_until:
+            return
+        self.fraction = min(max(float(fraction), 0.0), 1.0)
+        self._draw()
+
+    def retheme(self):
+        self.configure(bg=C["RAIL"])
+        self._draw()
+
+    def _draw(self):
+        self.delete("all")
+        width = max(self.winfo_width(), 1)
+        y, half = self._height / 2, px(1.5)
+        self.create_rectangle(0, y - half, width, y + half,
+                              fill=C["TRACK"], outline="")
+        if self.fraction > 0:
+            self.create_rectangle(0, y - half, width * self.fraction, y + half,
+                                  fill=C["MOTION"], outline="")
+        if self.seekable:
+            x, r = width * self.fraction, px(6.5)
+            self.create_oval(x - r, y - r, x + r, y + r,
+                             fill=C["MOTION"], outline="")
+
+    def _drag(self, event):
+        """Track the pointer, but do not touch the player until it is let go.
+
+        Seeking is a D-Bus round trip; asking for one on every motion event
+        would fire dozens of them across a single gesture.
+        """
+        if not self.seekable:
+            return
+        self._dragging = True
+        width = max(self.winfo_width(), 1)
+        self.fraction = min(max(event.x / width, 0.0), 1.0)
+        self._draw()
+
+    def _release(self, _event):
+        if not self._dragging:
+            return
+        self._dragging = False
+        self._hold_until = time.monotonic() + self.HOLD
+        self.on_seek(self.fraction)
+
+
+class NowPlaying(tk.Frame):
+    """What is playing, and the controls for it, at the head of the rail.
+
+    The panel is always present -- it carries the engine's Start/Stop button --
+    so an empty state is part of the design rather than a hidden widget.
+    """
+
+    TEXT_W = 258          # design px available to the title, beside the cover
+    EMPTY_TITLE = "Nothing playing"
+    EMPTY_ARTIST = "Start a track in any player and it appears here"
+
+    def __init__(self, master, fonts, *, on_prev, on_play_pause, on_next,
+                 on_seek, on_toggle):
+        super().__init__(master, bd=0, highlightthickness=0)
+        self._fonts = fonts
+        self._shown: tuple | None = None
+        self._elapsed = ""
+
+        head = tk.Frame(self, bd=0, highlightthickness=0)
+        head.pack(fill="x")
+        self.heading = tk.Label(head, text=_track("NOW PLAYING"), bd=0, anchor="w",
+                                highlightthickness=0, font=fonts["section"])
+        self.heading.pack(side="left")
+        self.source = tk.Label(head, text="", bd=0, anchor="e",
+                               highlightthickness=0, font=fonts["np_source"])
+        self.source.pack(side="right")
+
+        body = tk.Frame(self, bd=0, highlightthickness=0)
+        body.pack(fill="x", pady=(px(13), 0))
+        self.cover = CoverTile(body, fonts["np_cover"])
+        self.cover.pack(side="left")
+
+        text = tk.Frame(body, bd=0, highlightthickness=0)
+        text.pack(side="left", fill="x", expand=True, padx=(px(14), 0))
+
+        # Each line gets a row of its own with a height fixed to the taller of
+        # the two scripts, so switching from a Latin track to an Arabic one
+        # cannot resize the panel underneath everything else in the rail.
+        self._name_row = tk.Frame(text, bd=0, highlightthickness=0)
+        self._name_row.pack(fill="x")
+        self._name_row.pack_propagate(False)
+        self.name = tk.Label(self._name_row, text=self.EMPTY_TITLE, bd=0,
+                             anchor="w", highlightthickness=0, font=fonts["np_title"])
+        self.name.pack(fill="both", expand=True)
+
+        self._artist_row = tk.Frame(text, bd=0, highlightthickness=0)
+        self._artist_row.pack(fill="x", pady=(px(2), 0))
+        self._artist_row.pack_propagate(False)
+        self.artist = tk.Label(self._artist_row, text=self.EMPTY_ARTIST, bd=0,
+                               anchor="w", highlightthickness=0, font=fonts["np_artist"])
+        self.artist.pack(fill="both", expand=True)
+
+        times = tk.Frame(text, bd=0, highlightthickness=0)
+        times.pack(fill="x", pady=(px(9), 0))
+        self.elapsed = tk.Label(times, text="0:00", bd=0, highlightthickness=0,
+                                font=fonts["np_time"])
+        self.elapsed.pack(side="left")
+        self.total = tk.Label(times, text="0:00", bd=0, highlightthickness=0,
+                              font=fonts["np_time"])
+        self.total.pack(side="right")
+        self.bar = ProgressBar(times, on_seek)
+        self.bar.pack(side="left", fill="x", expand=True, padx=px(9))
+
+        row = tk.Frame(self, bd=0, highlightthickness=0)
+        row.pack(fill="x", pady=(px(14), 0))
+        self.buttons = [
+            TransportButton(row, "prev", on_prev),
+            TransportButton(row, "play", on_play_pause),
+            TransportButton(row, "next", on_next),
+        ]
+        for i, button in enumerate(self.buttons):
+            button.pack(side="left", padx=(0, px(16)) if i < 2 else 0)
+        self.action = PressButton(row, "Start", on_toggle, bg="ACCENT",
+                                  fg="ON_MOTION", hover="ACCENT_TEXT",
+                                  font=fonts["button"])
+        self.action.pack(side="right")
+
+        self._frames = [head, body, text, times, row,
+                        self._name_row, self._artist_row]
+        self.retheme()
+
+    def _lock_heights(self):
+        """Pin each text row to the taller of the two scripts it may carry."""
+        def tallest(*keys):
+            return max(tkfont.Font(font=self._fonts[k]).metrics("linespace")
+                       for k in keys)
+        self._name_row.configure(height=tallest("np_title", "np_title_ar"))
+        self._artist_row.configure(height=tallest("np_artist", "np_artist_ar"))
+
+    # -- painting ----------------------------------------------------------
+
+    def retheme(self, fonts=None):
+        if fonts is not None:
+            self._fonts = fonts
+        f = self._fonts
+        self.configure(bg=C["RAIL"])
+        for frame in self._frames:
+            frame.configure(bg=C["RAIL"])
+        self.heading.configure(bg=C["RAIL"], fg=C["ACCENT_TEXT"], font=f["section"])
+        self.source.configure(bg=C["RAIL"], fg=C["RAIL_FAINT"], font=f["np_source"])
+        self.name.configure(bg=C["RAIL"], font=f["np_title"])
+        self.artist.configure(bg=C["RAIL"], fg=C["RAIL_SOFT"], font=f["np_artist"])
+        for label in (self.elapsed, self.total):
+            label.configure(bg=C["RAIL"], fg=C["RAIL_FAINT"], font=f["np_time"])
+        self.cover.retheme(f["np_cover"])
+        self._lock_heights()
+        self.bar.retheme()
+        for button in self.buttons:
+            button.retheme()
+        self.action.retheme()
+        # The ink on the title depends on whether there is one, so let the next
+        # update decide it rather than guessing here.
+        self._shown = None
+        self._elapsed = ""
+
+    # -- contents ----------------------------------------------------------
+
+    def _face(self, text: str, key: str):
+        """The bundled face for whichever script `text` is written in."""
+        return self._fonts[f"{key}_ar" if bidi.has_arabic(text) else key]
+
+    def update_track(self, track, now: float):
+        f = self._fonts
+        if track is None:
+            state = (None,)
+            if state != self._shown:
+                self._shown = state
+                self.name.configure(text=self.EMPTY_TITLE, fg=C["RAIL_GHOST"],
+                                    font=f["np_title"])
+                self.artist.configure(text=self.EMPTY_ARTIST, fg=C["RAIL_GHOST"],
+                                      font=f["np_artist"])
+                self.source.configure(text="")
+                self.cover.set("—", False, f["np_cover"])
+                self.total.configure(text="0:00")
+                self._elapsed = "0:00"
+                self.elapsed.configure(text=self._elapsed)
+                for button in self.buttons:
+                    button.set_enabled(False)
+                self.buttons[1].set_glyph("play")
+                self.bar.set(0.0, False)
+            return
+
+        title = track.title or "No track details"
+        artist = track.artist_line or f"{track.player} is not reporting metadata"
+        source = track.player + (" · captured" if track.captured else "")
+        controllable = bool(track.bus)
+        # Each line is set in the face that suits the script it is written in,
+        # since neither bundled font covers the other's alphabet.
+        title_font = self._face(title, "np_title")
+        artist_font = self._face(artist, "np_artist")
+        cover_font = self._face(track.initials, "np_cover")
+        state = (title, artist, source, track.initials, track.playing,
+                 track.can_prev, track.can_next, controllable, track.length,
+                 title_font, artist_font)
+
+        if state != self._shown:
+            self._shown = state
+            width = px(self.TEXT_W)
+            self.name.configure(
+                text=_ellipsize(title, title_font, width, bidi.present),
+                font=title_font,
+                fg=C["RAIL_INK"] if track.known else C["RAIL_SOFT"])
+            self.artist.configure(
+                text=_ellipsize(artist, artist_font, width, bidi.present),
+                font=artist_font, fg=C["RAIL_SOFT"])
+            self.source.configure(text=source)
+            self.cover.set(bidi.present(track.initials), True, cover_font)
+            self.total.configure(text=_clock(track.length) if track.length else "—")
+            self.buttons[0].set_enabled(controllable and track.can_prev)
+            self.buttons[1].set_enabled(controllable)
+            self.buttons[1].set_glyph("pause" if track.playing else "play")
+            self.buttons[2].set_enabled(controllable and track.can_next)
+
+        # The bar is repainted every frame so the handle glides, but the clock
+        # only ever ticks once a second.
+        position = track.at(now)
+        elapsed = _clock(position) if track.length else "—"
+        if elapsed != self._elapsed:
+            self._elapsed = elapsed
+            self.elapsed.configure(text=elapsed)
+        self.bar.set(position / track.length if track.length else 0.0,
+                     track.can_seek and track.length > 0)
+
+
+# --------------------------------------------------------------------------
 # the stage
 # --------------------------------------------------------------------------
 
@@ -895,6 +1301,9 @@ class OrbitStage(tk.Canvas):
 class App(tk.Tk):
     def __init__(self):
         global SCALE
+        # Before the interpreter exists: fontconfig reads its configuration once
+        # and caches it for the life of the process.
+        bundled.bootstrap()
         super().__init__()
         self.title("8D Music — Real-Time Spatial Audio")
 
@@ -919,6 +1328,9 @@ class App(tk.Tk):
         self._themed: list = []
         self.sinks: list[pw.Sink] = []
         self._output_moves = 0
+        # Built before the layout: the rail wires its transport buttons
+        # straight to it.
+        self.now = nowplaying.Watcher()
 
         self._build_layout()
         self._sync_widgets(params)
@@ -937,6 +1349,7 @@ class App(tk.Tk):
                 "Install with: sudo apt install pipewire-bin", "bad")
             self.start_button.set_enabled(False)
 
+        self.now.start()
         self.after(33, self._tick)
 
     # -- theme -------------------------------------------------------------
@@ -968,9 +1381,15 @@ class App(tk.Tk):
         return next((f for f in SERIF_STACK if f in families),
                     tkfont.nametofont("TkDefaultFont").cget("family"))
 
+    def _bundled(self, wanted: str, fallback: str) -> str:
+        """A face we ship, or the interface's own if it did not load."""
+        return wanted if wanted in set(tkfont.families()) else fallback
+
     def _build_fonts(self, family):
         # Negative sizes are pixels in Tk, and Xft then enlarges them by the
         # same factor `px()` applies to the layout, so both stay in step.
+        arabic = self._bundled(bundled.ARABIC, family)
+        latin = self._bundled(bundled.LATIN, family)
         return {
             "hero": (family, -44, "bold"),
             "tagline": (family, -15),
@@ -992,6 +1411,23 @@ class App(tk.Tk):
             "value_sm": (family, -13, "bold"),
             "button": (family, -15, "bold"),
             "ghost": (family, -13),
+            "np_time": (family, -12),
+            "np_source": (family, -12),
+            # The track itself is set in the bundled faces, one per script --
+            # OffBit has no Arabic and KO Methlama has no Latin, so neither can
+            # stand in for the other.  Arabic runs a couple of pixels larger to
+            # match the Latin cap height, and both are sized so the two lines
+            # occupy the same room and the panel does not shift between tracks.
+            "np_title": (latin, -19),
+            "np_artist": (latin, -14),
+            "np_cover": (latin, -24),
+            # Sized by ascent rather than nominal size: KO Methlama carries a
+            # much larger line gap than OffBit, so equal numbers would draw
+            # wildly unequal letters.  Arabic sits a shade above the Latin so
+            # the dots and finer joins hold up at the same reading distance.
+            "np_title_ar": (arabic, -15),
+            "np_artist_ar": (arabic, -11),
+            "np_cover_ar": (arabic, -18),
         }
 
     def _paint(self, widget, **tokens):
@@ -1141,14 +1577,21 @@ class App(tk.Tk):
         fonts = self._fonts
         pct = lambda v: f"{v * 100:.0f}%"
 
-        head = tk.Frame(rail, bd=0, highlightthickness=0)
-        head.pack(fill="x")
-        self._paint(head, bg="RAIL")
-        self.start_button = PressButton(
-            head, "Start", self.toggle_engine, bg="ACCENT", fg="ON_MOTION",
-            hover="ACCENT_TEXT", font=fonts["button"])
-        self.start_button.pack(side="right")
-        self._themed.append(self.start_button)
+        # ---- now playing -----------------------------------------------------
+        # This block owns the transport row, and the engine's own Start/Stop
+        # button sits at the end of it.
+        self.now_playing = NowPlaying(
+            rail, fonts,
+            on_prev=self.now.previous, on_play_pause=self.now.play_pause,
+            on_next=self.now.next, on_seek=self.now.seek,
+            on_toggle=self.toggle_engine)
+        self.now_playing.pack(fill="x")
+        self._themed.append(self.now_playing)
+        self.start_button = self.now_playing.action
+
+        rule = tk.Frame(rail, height=px(1), bd=0, highlightthickness=0)
+        rule.pack(fill="x", pady=(px(22), 0))
+        self._paint(rule, bg="RAIL_LINE")
 
         # ---- movement ------------------------------------------------------
         move = self._block(rail, "Movement", (22, 0))
@@ -1440,6 +1883,10 @@ class App(tk.Tk):
         self.stage.refresh(self.engine.angle, self.engine.distance, running,
                            self.engine.levels(), status.load)
 
+        # The watcher needs to know our sink to tell whose audio we carry.
+        self.now.sink_id = self.engine.sink_id
+        self.now_playing.update_track(self.now.track, time.monotonic())
+
         if status.output_moves != self._output_moves:
             self._output_moves = status.output_moves
             self._follow_engine_output(status.output)
@@ -1469,6 +1916,7 @@ class App(tk.Tk):
             "theme": self.theme,
         }
         try:
+            self.now.stop()
             self.engine.stop()
         finally:
             config.save(self.engine.params, prefs)

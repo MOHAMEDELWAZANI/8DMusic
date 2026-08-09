@@ -14,6 +14,15 @@ Real-time 8D spatial audio for **everything your computer plays**. No uploading,
 no converting, no per-file processing — YouTube, Spotify, games, movies, Discord
 and anything else are all spatialised live on their way to your headphones.
 
+<p align="center">
+  <img src="docs/dark.png" width="900"
+       alt="8D Music in dark mode: the orbit visualiser fills the window with the source mid-lap, and the right rail carries the now playing panel above the movement and space controls">
+</p>
+
+<p align="center">
+  <sub>Dark mode. The rail scrolls — a taller window shows the rest of it.</sub>
+</p>
+
 ## Run it
 
 ```bash
@@ -77,6 +86,11 @@ zippers while you move the controls.
 The top of the rail shows what you are actually listening to — title, artists,
 elapsed time — with skip and play/pause that drive the player itself, not the
 effect. Nothing has to be configured, and nothing leaves the machine.
+
+<p align="center">
+  <img src="docs/now-playing-dark.png" width="840"
+       alt="The now playing panel in dark mode, twice. Left: Love The Way You Lie by Eminem and Rihanna, set in OffBit, cover reading Er. Right: فكروني by أم كلثوم, set in KO Methlama, running right to left with its letters joined and the cover reading أم">
+</p>
 
 Two sources feed it:
 
@@ -235,10 +249,29 @@ eight_d/
   config.py     settings persistence (~/.config/8dmusic/settings.json)
   assets/       app icons and the logo lockup
   assets/fonts/ the two bundled faces
+docs/
+  dark.png, now-playing-dark.png   the images above
 tools/
   make_icons.py       regenerates everything in assets/ from the logo geometry
   make_arabic_font.py rebuilds the bundled Arabic face (see below)
+  make_screenshots.py re-renders docs/ from the design mockups
 ```
+
+### The images
+
+They are rendered from the mockups in `8D Audio Effect Tool UI`, not captured
+from a running window: this is a Tk app on a Wayland desktop, where the
+compositor hands window grabs to its own portal only, so there is no way to
+photograph it unattended. The mockups are the layout the interface was built to
+and the panel is composed from the widget's own measurements, so the pictures
+are honest about the design — with the caveat that Tk fakes the gradients, blur
+and rounded corners the browser draws for real.
+
+```bash
+python3 tools/make_screenshots.py
+```
+
+Needs a Chromium-family browser to rasterise, and nothing else.
 
 ### The bundled Arabic face
 

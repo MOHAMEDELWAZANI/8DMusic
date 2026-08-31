@@ -1,14 +1,9 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="eight_d/assets/logo-lockup-dark.png">
-    <img src="eight_d/assets/logo-lockup-light.png" alt="8D Music — spatial audio, live" width="415">
+    <source media="(prefers-color-scheme: dark)" srcset="eight_d/assets/8Dcover.png">
   </picture>
 </p>
 
-<p align="center">
-  <img alt="audio: PipeWire" src="https://img.shields.io/badge/audio-PipeWire-blue">
-  <img alt="python: 3.9+" src="https://img.shields.io/badge/python-3.9%2B-green">
-</p>
 
 Real-time 8D spatial audio for **everything your computer plays**. No uploading,
 no converting, no per-file processing — YouTube, Spotify, games, movies, Discord

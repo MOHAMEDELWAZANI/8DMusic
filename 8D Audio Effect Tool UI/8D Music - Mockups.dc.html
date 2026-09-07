@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/broadsheet-29e4875d-0372-4766-8b57-be15d4bd4312/styles.css">
+<script src="_ds/broadsheet-29e4875d-0372-4766-8b57-be15d4bd4312/_ds_bundle.js"></script>
+<style>
+body{margin:0;background:#e4e2df;font-family:"Source Serif 4",serif}
+a{color:#006786}a:hover{color:#0088b0}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#201e1d;color:#fff;border-radius:2px;text-decoration:none}
+.dv-tname{font:600 13px/1.2 "Source Serif 4",serif;color:#201e1d}
+.dv-opts{display:flex;flex-wrap:wrap;gap:34px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#201e1d;border-radius:2px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 12px/1.3 "Source Serif 4",serif;color:rgba(32,30,29,.6)}
+.dv-opt:target .dv-oid{background:#0088b0;color:#fff}
+.dv-next{margin:22px 0 0;font:12px/1.5 "Source Serif 4",serif;color:rgba(32,30,29,.55)}
+@keyframes orbit{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes counter{from{transform:rotate(0deg)}to{transform:rotate(-360deg)}}
+@keyframes sweep{0%{transform:translateX(0)}50%{transform:translateX(560px)}100%{transform:translateX(0)}}
+@keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+</style></helmet>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">8D Music — full-canvas visualizer, pro density</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Press sheet — paper ground, orbit fills the window, controls in a right rail</div>
+<div style="width:1180px;border:1px solid rgba(32,30,29,.18);border-radius:4px;overflow:hidden;box-shadow:0 12px 32px rgba(45,43,43,.22);background:#f3f2f2">
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#eae9e9;border-bottom:1px solid rgba(32,30,29,.14)">
+    <div style="display:flex;gap:7px"><span style="width:11px;height:11px;border-radius:50%;background:#d6006c;display:block"></span><span style="width:11px;height:11px;border-radius:50%;background:#edbb00;display:block"></span><span style="width:11px;height:11px;border-radius:50%;background:#0088b0;display:block"></span></div>
+    <div style="flex:1;text-align:center;font:600 12px/1 'Source Serif 4',serif;letter-spacing:.16em;text-transform:uppercase;color:rgba(32,30,29,.6)">8D Music — Real-Time Spatial Audio</div>
+    <div style="display:flex;border:1px solid rgba(32,30,29,.2);border-radius:2px;overflow:hidden"><span style="padding:4px 10px;background:#201e1d;color:#f3f2f2;font:600 11px/1.2 'Source Serif 4',serif;letter-spacing:.1em">Light</span><span style="padding:4px 10px;color:rgba(32,30,29,.55);font:400 11px/1.2 'Source Serif 4',serif;letter-spacing:.1em">Dark</span></div>
+  </div>
+
+  <div style="position:relative;height:720px;display:flex">
+    <div style="position:relative;flex:1;overflow:hidden">
+      <div style="position:absolute;inset:0;background:radial-gradient(circle at 46% 50%,#fbfafa 0%,#f3f2f2 60%,#eceaea 100%)"></div>
+      <div style="position:absolute;left:46%;top:50%;transform:translate(-50%,-50%);width:560px;height:560px">
+        <div style="position:absolute;inset:0;border:1px solid rgba(32,30,29,.10);border-radius:50%"></div>
+        <div style="position:absolute;inset:70px;border:1px solid rgba(32,30,29,.12);border-radius:50%"></div>
+        <div style="position:absolute;inset:140px;border:1px dashed rgba(0,136,176,.45);border-radius:50%"></div>
+        <div style="position:absolute;inset:236px;border:1px solid rgba(32,30,29,.16);border-radius:50%"></div>
+        <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(32,30,29,.07)"></div>
+        <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:rgba(32,30,29,.07)"></div>
+        <div style="position:absolute;inset:140px;border-radius:50%;background:conic-gradient(from -20deg,rgba(214,0,108,.55) 0deg,rgba(214,0,108,0) 78deg,transparent 360deg);-webkit-mask:radial-gradient(circle,transparent 138px,#000 139px,#000 141px,transparent 142px);mask:radial-gradient(circle,transparent 138px,#000 139px,#000 141px,transparent 142px)"></div>
+        <div style="position:absolute;inset:0;animation:counter 14s linear infinite">
+          <div style="position:absolute;left:50%;top:140px;transform:translate(-50%,-50%);width:20px;height:20px;border-radius:50%;background:#d6006c;box-shadow:0 0 0 8px rgba(214,0,108,.16),0 0 0 18px rgba(214,0,108,.07)"></div>
+        </div>
+        <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:104px;height:104px;border-radius:50%;border:1px solid rgba(32,30,29,.3);display:flex;align-items:center;justify-content:center">
+          <div style="width:52px;height:52px;border-radius:50%;border:1px solid rgba(32,30,29,.35);position:relative">
+            <div style="position:absolute;left:50%;top:-9px;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:9px solid rgba(32,30,29,.4)"></div>
+          </div>
+        </div>
+        <div style="position:absolute;left:50%;top:-26px;transform:translateX(-50%);font:600 11px/1 'Source Serif 4',serif;letter-spacing:.22em;color:rgba(32,30,29,.42)">FRONT</div>
+        <div style="position:absolute;left:50%;bottom:-26px;transform:translateX(-50%);font:600 11px/1 'Source Serif 4',serif;letter-spacing:.22em;color:rgba(32,30,29,.42)">BACK</div>
+        <div style="position:absolute;left:-24px;top:50%;transform:translateY(-50%);font:600 11px/1 'Source Serif 4',serif;color:rgba(32,30,29,.42)">L</div>
+        <div style="position:absolute;right:-24px;top:50%;transform:translateY(-50%);font:600 11px/1 'Source Serif 4',serif;color:rgba(32,30,29,.42)">R</div>
+      </div>
+
+      <div style="position:absolute;left:34px;top:30px;display:flex;flex-direction:column;gap:4px">
+        <div style="font:600 44px/1 'Source Serif 4',serif;letter-spacing:-.02em;color:#201e1d">8D Music</div>
+        <div style="font:400 15px/1.4 'Source Serif 4',serif;color:rgba(32,30,29,.6);max-width:340px">Real-time spatial audio for everything your system plays</div>
+        <div style="display:flex;align-items:center;gap:9px;margin-top:14px">
+          <span style="width:8px;height:8px;border-radius:50%;background:#d6006c;animation:pulse 1.8s ease-in-out infinite;display:block"></span>
+          <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:.2em;text-transform:uppercase;color:#aa0b56">Processing system audio</span>
+        </div>
+      </div>
+
+      <div style="position:absolute;left:34px;bottom:28px;display:flex;flex-direction:column;gap:12px;width:330px">
+        <div style="display:flex;gap:22px;font:400 13px/1 'Source Serif 4',serif;color:rgba(32,30,29,.65)">
+          <span style="color:#006786;font-weight:600">−72°</span><span>1.00 m</span><span>left</span><span>cpu 32%</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;align-items:center;gap:8px"><span style="font:400 11px/1 'Source Serif 4',serif;color:rgba(32,30,29,.5);width:9px">L</span><span style="flex:1;height:5px;background:rgba(32,30,29,.10);position:relative;display:block"><span style="position:absolute;left:0;top:0;bottom:0;width:64%;background:#0088b0;display:block"></span></span></div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="font:400 11px/1 'Source Serif 4',serif;color:rgba(32,30,29,.5);width:9px">R</span><span style="flex:1;height:5px;background:rgba(32,30,29,.10);position:relative;display:block"><span style="position:absolute;left:0;top:0;bottom:0;width:23%;background:#0088b0;display:block"></span></span></div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+          <span style="padding:5px 11px;border:1px solid #0088b0;background:rgba(0,136,176,.10);color:#006786;font:600 12px/1 'Source Serif 4',serif;border-radius:2px">Classic 8D</span>
+          <span style="padding:5px 11px;border:1px solid rgba(32,30,29,.2);color:rgba(32,30,29,.7);font:400 12px/1 'Source Serif 4',serif;border-radius:2px">Slow Orbit</span>
+          <span style="padding:5px 11px;border:1px solid rgba(32,30,29,.2);color:rgba(32,30,29,.7);font:400 12px/1 'Source Serif 4',serif;border-radius:2px">Ping-Pong</span>
+          <span style="padding:5px 11px;border:1px solid rgba(32,30,29,.2);color:rgba(32,30,29,.7);font:400 12px/1 'Source Serif 4',serif;border-radius:2px">Wide Cinema</span>
+          <span style="padding:5px 11px;border:1px solid rgba(32,30,29,.2);color:rgba(32,30,29,.7);font:400 12px/1 'Source Serif 4',serif;border-radius:2px">Deep Space</span>
+          <span style="padding:5px 11px;border:1px solid rgba(32,30,29,.2);color:rgba(32,30,29,.7);font:400 12px/1 'Source Serif 4',serif;border-radius:2px">Figure Eight</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:404px;flex:none;padding:26px 30px 24px;background:rgba(243,242,242,.86);backdrop-filter:blur(8px);border-left:1px solid rgba(32,30,29,.12);display:flex;flex-direction:column;gap:22px;overflow:hidden">
+      <div style="display:flex;justify-content:flex-end">
+        <span style="padding:11px 34px;background:#d6006c;color:#fff;font:600 15px/1 'Source Serif 4',serif;border-radius:2px;letter-spacing:.04em">Stop</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:13px">
+        <div style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:.24em;text-transform:uppercase;color:#006786">Movement</div>
+        <div style="display:flex;gap:8px">
+          <span style="flex:1;padding:8px 11px;border:1px solid rgba(32,30,29,.22);background:#fbfafa;font:400 14px/1 'Source Serif 4',serif;border-radius:2px;display:flex;justify-content:space-between;align-items:center">Circular orbit<span style="color:rgba(32,30,29,.4)">▾</span></span>
+          <span style="width:132px;padding:8px 11px;border:1px solid rgba(32,30,29,.22);background:#fbfafa;font:400 14px/1 'Source Serif 4',serif;border-radius:2px;display:flex;justify-content:space-between;align-items:center">Counter-cw<span style="color:rgba(32,30,29,.4)">▾</span></span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 15px/1 'Source Serif 4',serif">Movement speed</span><span style="font:600 14px/1 'Source Serif 4',serif;color:#006786">0.22 rot/s · 4.6 s</span></div>
+          <div style="height:3px;background:rgba(32,30,29,.14);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:22%;background:#0088b0"></div><div style="position:absolute;left:22%;top:50%;transform:translate(-50%,-50%);width:13px;height:13px;border-radius:50%;background:#0088b0"></div></div>
+          <div style="font:400 12.5px/1.4 'Source Serif 4',serif;color:rgba(32,30,29,.5)">How fast the source travels around you</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 15px/1 'Source Serif 4',serif">Orbit radius</span><span style="font:600 14px/1 'Source Serif 4',serif;color:#006786">1.00 m</span></div>
+          <div style="height:3px;background:rgba(32,30,29,.14);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:38%;background:#0088b0"></div><div style="position:absolute;left:38%;top:50%;transform:translate(-50%,-50%);width:13px;height:13px;border-radius:50%;background:#0088b0"></div></div>
+          <div style="font:400 12.5px/1.4 'Source Serif 4',serif;color:rgba(32,30,29,.5)">Virtual distance to the source — affects level and tone</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 15px/1 'Source Serif 4',serif">Effect depth</span><span style="font:600 14px/1 'Source Serif 4',serif;color:#006786">90%</span></div>
+          <div style="height:3px;background:rgba(32,30,29,.14);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:90%;background:#0088b0"></div><div style="position:absolute;left:90%;top:50%;transform:translate(-50%,-50%);width:13px;height:13px;border-radius:50%;background:#0088b0"></div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 15px/1 'Source Serif 4',serif">Smoothness</span><span style="font:600 14px/1 'Source Serif 4',serif;color:#006786">35%</span></div>
+          <div style="height:3px;background:rgba(32,30,29,.14);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:35%;background:#0088b0"></div><div style="position:absolute;left:35%;top:50%;transform:translate(-50%,-50%);width:13px;height:13px;border-radius:50%;background:#0088b0"></div></div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:13px">
+        <div style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:.24em;text-transform:uppercase;color:#006786">Space</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 15px/1 'Source Serif 4',serif">Stereo width</span><span style="font:600 14px/1 'Source Serif 4',serif;color:#006786">115%</span></div>
+          <div style="height:3px;background:rgba(32,30,29,.14);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:57%;background:#0088b0"></div><div style="position:absolute;left:57%;top:50%;transform:translate(-50%,-50%);width:13px;height:13px;border-radius:50%;background:#0088b0"></div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 22px">
+          <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 14px/1 'Source Serif 4',serif">Delay</span><span style="font:600 13px/1 'Source Serif 4',serif;color:rgba(32,30,29,.45)">0%</span></div><div style="height:3px;background:rgba(32,30,29,.14);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:2%;background:rgba(32,30,29,.3)"></div></div></div>
+          <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 14px/1 'Source Serif 4',serif">Reverb</span><span style="font:600 13px/1 'Source Serif 4',serif;color:#006786">18%</span></div><div style="height:3px;background:rgba(32,30,29,.14);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:18%;background:#0088b0"></div></div></div>
+          <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 14px/1 'Source Serif 4',serif">Delay time</span><span style="font:600 13px/1 'Source Serif 4',serif;color:rgba(32,30,29,.45)">40 ms</span></div><div style="height:3px;background:rgba(32,30,29,.14);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:12%;background:rgba(32,30,29,.3)"></div></div></div>
+          <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 14px/1 'Source Serif 4',serif">Room size</span><span style="font:600 13px/1 'Source Serif 4',serif;color:#006786">60%</span></div><div style="height:3px;background:rgba(32,30,29,.14);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:60%;background:#0088b0"></div></div></div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:11px;margin-top:auto">
+        <div style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:.24em;text-transform:uppercase;color:#006786">Output</div>
+        <span style="padding:8px 11px;border:1px solid rgba(32,30,29,.22);background:#fbfafa;font:400 14px/1 'Source Serif 4',serif;border-radius:2px;display:flex;justify-content:space-between;align-items:center">Built-in Audio Analog Stereo<span style="color:rgba(32,30,29,.4)">▾</span></span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="flex:1;padding:8px 11px;border:1px solid rgba(32,30,29,.22);background:#fbfafa;font:400 14px/1 'Source Serif 4',serif;border-radius:2px;display:flex;justify-content:space-between;align-items:center">Safe (most stable)<span style="color:rgba(32,30,29,.4)">▾</span></span>
+          <span style="display:flex;align-items:center;gap:7px;font:400 14px/1 'Source Serif 4',serif;color:rgba(32,30,29,.7)"><span style="width:13px;height:13px;border:1px solid rgba(32,30,29,.35);display:block"></span>Bypass</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 14px/1 'Source Serif 4',serif">Output volume</span><span style="font:600 13px/1 'Source Serif 4',serif;color:#006786">75%</span></div>
+          <div style="height:3px;background:rgba(32,30,29,.14);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:75%;background:#0088b0"></div><div style="position:absolute;left:75%;top:50%;transform:translate(-50%,-50%);width:13px;height:13px;border-radius:50%;background:#0088b0"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Ink ground — the same layout inverted, plates glowing on black</div>
+<div style="width:1180px;border:1px solid rgba(243,242,242,.14);border-radius:4px;overflow:hidden;box-shadow:0 12px 32px rgba(45,43,43,.4);background:#1a1918">
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#201e1d;border-bottom:1px solid rgba(243,242,242,.12)">
+    <div style="display:flex;gap:7px"><span style="width:11px;height:11px;border-radius:50%;background:#ff458e;display:block"></span><span style="width:11px;height:11px;border-radius:50%;background:#edbb00;display:block"></span><span style="width:11px;height:11px;border-radius:50%;background:#62c5ee;display:block"></span></div>
+    <div style="flex:1;text-align:center;font:600 12px/1 'Source Serif 4',serif;letter-spacing:.16em;text-transform:uppercase;color:rgba(243,242,242,.5)">8D Music — Real-Time Spatial Audio</div>
+    <div style="display:flex;border:1px solid rgba(243,242,242,.22);border-radius:2px;overflow:hidden"><span style="padding:4px 10px;color:rgba(243,242,242,.5);font:400 11px/1.2 'Source Serif 4',serif;letter-spacing:.1em">Light</span><span style="padding:4px 10px;background:#f3f2f2;color:#201e1d;font:600 11px/1.2 'Source Serif 4',serif;letter-spacing:.1em">Dark</span></div>
+  </div>
+
+  <div style="position:relative;height:720px;display:flex;color:#f3f2f2">
+    <div style="position:relative;flex:1;overflow:hidden">
+      <div style="position:absolute;inset:0;background:radial-gradient(circle at 46% 50%,#242220 0%,#1a1918 62%,#141312 100%)"></div>
+      <div style="position:absolute;left:46%;top:50%;transform:translate(-50%,-50%);width:560px;height:560px">
+        <div style="position:absolute;inset:0;border:1px solid rgba(243,242,242,.09);border-radius:50%"></div>
+        <div style="position:absolute;inset:70px;border:1px solid rgba(243,242,242,.11);border-radius:50%"></div>
+        <div style="position:absolute;inset:140px;border:1px dashed rgba(98,197,238,.5);border-radius:50%"></div>
+        <div style="position:absolute;inset:236px;border:1px solid rgba(243,242,242,.14);border-radius:50%"></div>
+        <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(243,242,242,.06)"></div>
+        <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:rgba(243,242,242,.06)"></div>
+        <div style="position:absolute;inset:140px;border-radius:50%;background:conic-gradient(from -20deg,rgba(255,69,142,.85) 0deg,rgba(255,69,142,0) 78deg,transparent 360deg);-webkit-mask:radial-gradient(circle,transparent 138px,#000 139px,#000 141px,transparent 142px);mask:radial-gradient(circle,transparent 138px,#000 139px,#000 141px,transparent 142px)"></div>
+        <div style="position:absolute;inset:0;animation:counter 14s linear infinite">
+          <div style="position:absolute;left:50%;top:140px;transform:translate(-50%,-50%);width:20px;height:20px;border-radius:50%;background:#ff458e;box-shadow:0 0 22px 6px rgba(255,69,142,.5),0 0 0 12px rgba(255,69,142,.12)"></div>
+        </div>
+        <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:104px;height:104px;border-radius:50%;border:1px solid rgba(243,242,242,.28);display:flex;align-items:center;justify-content:center">
+          <div style="width:52px;height:52px;border-radius:50%;border:1px solid rgba(243,242,242,.35);position:relative">
+            <div style="position:absolute;left:50%;top:-9px;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:9px solid rgba(243,242,242,.45)"></div>
+          </div>
+        </div>
+        <div style="position:absolute;left:50%;top:-26px;transform:translateX(-50%);font:600 11px/1 'Source Serif 4',serif;letter-spacing:.22em;color:rgba(243,242,242,.38)">FRONT</div>
+        <div style="position:absolute;left:50%;bottom:-26px;transform:translateX(-50%);font:600 11px/1 'Source Serif 4',serif;letter-spacing:.22em;color:rgba(243,242,242,.38)">BACK</div>
+        <div style="position:absolute;left:-24px;top:50%;transform:translateY(-50%);font:600 11px/1 'Source Serif 4',serif;color:rgba(243,242,242,.38)">L</div>
+        <div style="position:absolute;right:-24px;top:50%;transform:translateY(-50%);font:600 11px/1 'Source Serif 4',serif;color:rgba(243,242,242,.38)">R</div>
+      </div>
+
+      <div style="position:absolute;left:34px;top:30px;display:flex;flex-direction:column;gap:4px">
+        <div style="font:600 44px/1 'Source Serif 4',serif;letter-spacing:-.02em">8D Music</div>
+        <div style="font:400 15px/1.4 'Source Serif 4',serif;color:rgba(243,242,242,.55);max-width:340px">Real-time spatial audio for everything your system plays</div>
+        <div style="display:flex;align-items:center;gap:9px;margin-top:14px">
+          <span style="width:8px;height:8px;border-radius:50%;background:#ff458e;animation:pulse 1.8s ease-in-out infinite;display:block"></span>
+          <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:.2em;text-transform:uppercase;color:#ff90b1">Processing system audio</span>
+        </div>
+      </div>
+
+      <div style="position:absolute;left:34px;bottom:28px;display:flex;flex-direction:column;gap:12px;width:330px">
+        <div style="display:flex;gap:22px;font:400 13px/1 'Source Serif 4',serif;color:rgba(243,242,242,.6)">
+          <span style="color:#62c5ee;font-weight:600">−72°</span><span>1.00 m</span><span>left</span><span>cpu 32%</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;align-items:center;gap:8px"><span style="font:400 11px/1 'Source Serif 4',serif;color:rgba(243,242,242,.45);width:9px">L</span><span style="flex:1;height:5px;background:rgba(243,242,242,.12);position:relative;display:block"><span style="position:absolute;left:0;top:0;bottom:0;width:64%;background:#62c5ee;display:block"></span></span></div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="font:400 11px/1 'Source Serif 4',serif;color:rgba(243,242,242,.45);width:9px">R</span><span style="flex:1;height:5px;background:rgba(243,242,242,.12);position:relative;display:block"><span style="position:absolute;left:0;top:0;bottom:0;width:23%;background:#62c5ee;display:block"></span></span></div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+          <span style="padding:5px 11px;border:1px solid #62c5ee;background:rgba(98,197,238,.14);color:#99e0ff;font:600 12px/1 'Source Serif 4',serif;border-radius:2px">Classic 8D</span>
+          <span style="padding:5px 11px;border:1px solid rgba(243,242,242,.2);color:rgba(243,242,242,.65);font:400 12px/1 'Source Serif 4',serif;border-radius:2px">Slow Orbit</span>
+          <span style="padding:5px 11px;border:1px solid rgba(243,242,242,.2);color:rgba(243,242,242,.65);font:400 12px/1 'Source Serif 4',serif;border-radius:2px">Ping-Pong</span>
+          <span style="padding:5px 11px;border:1px solid rgba(243,242,242,.2);color:rgba(243,242,242,.65);font:400 12px/1 'Source Serif 4',serif;border-radius:2px">Wide Cinema</span>
+          <span style="padding:5px 11px;border:1px solid rgba(243,242,242,.2);color:rgba(243,242,242,.65);font:400 12px/1 'Source Serif 4',serif;border-radius:2px">Deep Space</span>
+          <span style="padding:5px 11px;border:1px solid rgba(243,242,242,.2);color:rgba(243,242,242,.65);font:400 12px/1 'Source Serif 4',serif;border-radius:2px">Figure Eight</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:404px;flex:none;padding:26px 30px 24px;background:rgba(26,25,24,.82);backdrop-filter:blur(8px);border-left:1px solid rgba(243,242,242,.12);display:flex;flex-direction:column;gap:22px;overflow:hidden">
+      <div style="display:flex;justify-content:flex-end">
+        <span style="padding:11px 34px;background:#ff458e;color:#201e1d;font:600 15px/1 'Source Serif 4',serif;border-radius:2px;letter-spacing:.04em">Stop</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:13px">
+        <div style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:.24em;text-transform:uppercase;color:#62c5ee">Movement</div>
+        <div style="display:flex;gap:8px">
+          <span style="flex:1;padding:8px 11px;border:1px solid rgba(243,242,242,.22);background:rgba(243,242,242,.05);font:400 14px/1 'Source Serif 4',serif;border-radius:2px;display:flex;justify-content:space-between;align-items:center">Circular orbit<span style="color:rgba(243,242,242,.4)">▾</span></span>
+          <span style="width:132px;padding:8px 11px;border:1px solid rgba(243,242,242,.22);background:rgba(243,242,242,.05);font:400 14px/1 'Source Serif 4',serif;border-radius:2px;display:flex;justify-content:space-between;align-items:center">Counter-cw<span style="color:rgba(243,242,242,.4)">▾</span></span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 15px/1 'Source Serif 4',serif">Movement speed</span><span style="font:600 14px/1 'Source Serif 4',serif;color:#62c5ee">0.22 rot/s · 4.6 s</span></div>
+          <div style="height:3px;background:rgba(243,242,242,.16);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:22%;background:#62c5ee"></div><div style="position:absolute;left:22%;top:50%;transform:translate(-50%,-50%);width:13px;height:13px;border-radius:50%;background:#62c5ee"></div></div>
+          <div style="font:400 12.5px/1.4 'Source Serif 4',serif;color:rgba(243,242,242,.45)">How fast the source travels around you</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 15px/1 'Source Serif 4',serif">Orbit radius</span><span style="font:600 14px/1 'Source Serif 4',serif;color:#62c5ee">1.00 m</span></div>
+          <div style="height:3px;background:rgba(243,242,242,.16);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:38%;background:#62c5ee"></div><div style="position:absolute;left:38%;top:50%;transform:translate(-50%,-50%);width:13px;height:13px;border-radius:50%;background:#62c5ee"></div></div>
+          <div style="font:400 12.5px/1.4 'Source Serif 4',serif;color:rgba(243,242,242,.45)">Virtual distance to the source — affects level and tone</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 15px/1 'Source Serif 4',serif">Effect depth</span><span style="font:600 14px/1 'Source Serif 4',serif;color:#62c5ee">90%</span></div>
+          <div style="height:3px;background:rgba(243,242,242,.16);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:90%;background:#62c5ee"></div><div style="position:absolute;left:90%;top:50%;transform:translate(-50%,-50%);width:13px;height:13px;border-radius:50%;background:#62c5ee"></div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 15px/1 'Source Serif 4',serif">Smoothness</span><span style="font:600 14px/1 'Source Serif 4',serif;color:#62c5ee">35%</span></div>
+          <div style="height:3px;background:rgba(243,242,242,.16);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:35%;background:#62c5ee"></div><div style="position:absolute;left:35%;top:50%;transform:translate(-50%,-50%);width:13px;height:13px;border-radius:50%;background:#62c5ee"></div></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:13px">
+        <div style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:.24em;text-transform:uppercase;color:#62c5ee">Space</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 15px/1 'Source Serif 4',serif">Stereo width</span><span style="font:600 14px/1 'Source Serif 4',serif;color:#62c5ee">115%</span></div>
+          <div style="height:3px;background:rgba(243,242,242,.16);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:57%;background:#62c5ee"></div><div style="position:absolute;left:57%;top:50%;transform:translate(-50%,-50%);width:13px;height:13px;border-radius:50%;background:#62c5ee"></div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 22px">
+          <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 14px/1 'Source Serif 4',serif">Delay</span><span style="font:600 13px/1 'Source Serif 4',serif;color:rgba(243,242,242,.4)">0%</span></div><div style="height:3px;background:rgba(243,242,242,.16);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:2%;background:rgba(243,242,242,.35)"></div></div></div>
+          <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 14px/1 'Source Serif 4',serif">Reverb</span><span style="font:600 13px/1 'Source Serif 4',serif;color:#62c5ee">18%</span></div><div style="height:3px;background:rgba(243,242,242,.16);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:18%;background:#62c5ee"></div></div></div>
+          <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 14px/1 'Source Serif 4',serif">Delay time</span><span style="font:600 13px/1 'Source Serif 4',serif;color:rgba(243,242,242,.4)">40 ms</span></div><div style="height:3px;background:rgba(243,242,242,.16);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:12%;background:rgba(243,242,242,.35)"></div></div></div>
+          <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 14px/1 'Source Serif 4',serif">Room size</span><span style="font:600 13px/1 'Source Serif 4',serif;color:#62c5ee">60%</span></div><div style="height:3px;background:rgba(243,242,242,.16);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:60%;background:#62c5ee"></div></div></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:11px;margin-top:auto">
+        <div style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:.24em;text-transform:uppercase;color:#62c5ee">Output</div>
+        <span style="padding:8px 11px;border:1px solid rgba(243,242,242,.22);background:rgba(243,242,242,.05);font:400 14px/1 'Source Serif 4',serif;border-radius:2px;display:flex;justify-content:space-between;align-items:center">Built-in Audio Analog Stereo<span style="color:rgba(243,242,242,.4)">▾</span></span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="flex:1;padding:8px 11px;border:1px solid rgba(243,242,242,.22);background:rgba(243,242,242,.05);font:400 14px/1 'Source Serif 4',serif;border-radius:2px;display:flex;justify-content:space-between;align-items:center">Safe (most stable)<span style="color:rgba(243,242,242,.4)">▾</span></span>
+          <span style="display:flex;align-items:center;gap:7px;font:400 14px/1 'Source Serif 4',serif;color:rgba(243,242,242,.65)"><span style="width:13px;height:13px;border:1px solid rgba(243,242,242,.35);display:block"></span>Bypass</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 14px/1 'Source Serif 4',serif">Output volume</span><span style="font:600 13px/1 'Source Serif 4',serif;color:#62c5ee">75%</span></div>
+          <div style="height:3px;background:rgba(243,242,242,.16);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:75%;background:#62c5ee"></div><div style="position:absolute;left:75%;top:50%;transform:translate(-50%,-50%);width:13px;height:13px;border-radius:50%;background:#62c5ee"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Stereo strip — the orbit unrolled into a scrolling L·R field, console along the bottom</div>
+<div style="width:1180px;border:1px solid rgba(32,30,29,.18);border-radius:4px;overflow:hidden;box-shadow:0 12px 32px rgba(45,43,43,.22);background:#f3f2f2">
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#eae9e9;border-bottom:1px solid rgba(32,30,29,.14)">
+    <div style="display:flex;gap:7px"><span style="width:11px;height:11px;border-radius:50%;background:#d6006c;display:block"></span><span style="width:11px;height:11px;border-radius:50%;background:#edbb00;display:block"></span><span style="width:11px;height:11px;border-radius:50%;background:#0088b0;display:block"></span></div>
+    <div style="flex:1;text-align:center;font:600 12px/1 'Source Serif 4',serif;letter-spacing:.16em;text-transform:uppercase;color:rgba(32,30,29,.6)">8D Music — Real-Time Spatial Audio</div>
+    <div style="display:flex;border:1px solid rgba(32,30,29,.2);border-radius:2px;overflow:hidden"><span style="padding:4px 10px;background:#201e1d;color:#f3f2f2;font:600 11px/1.2 'Source Serif 4',serif;letter-spacing:.1em">Light</span><span style="padding:4px 10px;color:rgba(32,30,29,.55);font:400 11px/1.2 'Source Serif 4',serif;letter-spacing:.1em">Dark</span></div>
+  </div>
+  <div style="height:720px;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:26px 34px 10px">
+      <div>
+        <div style="font:600 40px/1 'Source Serif 4',serif;letter-spacing:-.02em">8D Music</div>
+        <div style="font:400 15px/1.4 'Source Serif 4',serif;color:rgba(32,30,29,.6);margin-top:5px">Everything your system plays, orbiting your head</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:18px">
+        <div style="text-align:right;font:400 13px/1.5 'Source Serif 4',serif;color:rgba(32,30,29,.55)">Built-in Audio Analog Stereo<br>latency safe · cpu 32%</div>
+        <span style="padding:11px 34px;background:#d6006c;color:#fff;font:600 15px/1 'Source Serif 4',serif;border-radius:2px">Stop</span>
+      </div>
+    </div>
+
+    <div style="position:relative;flex:1;margin:8px 34px 0;overflow:hidden">
+      <div style="position:absolute;left:0;right:0;top:14%;height:1px;background:rgba(32,30,29,.08)"></div>
+      <div style="position:absolute;left:0;right:0;top:50%;height:1px;background:rgba(32,30,29,.22)"></div>
+      <div style="position:absolute;left:0;right:0;bottom:14%;height:1px;background:rgba(32,30,29,.08)"></div>
+      <div style="position:absolute;left:0;top:9%;font:600 11px/1 'Source Serif 4',serif;letter-spacing:.22em;color:rgba(32,30,29,.4)">LEFT</div>
+      <div style="position:absolute;left:0;top:47%;font:600 11px/1 'Source Serif 4',serif;letter-spacing:.22em;color:rgba(32,30,29,.4)">CENTRE</div>
+      <div style="position:absolute;left:0;bottom:9%;font:600 11px/1 'Source Serif 4',serif;letter-spacing:.22em;color:rgba(32,30,29,.4)">RIGHT</div>
+      <svg viewBox="0 0 1120 340" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%">
+        <path d="M0 170 C 70 20, 210 20, 280 170 S 490 320, 560 170 S 770 20, 840 170 S 1050 320, 1120 170" fill="none" stroke="#0088b0" stroke-width="2"></path>
+        <path d="M0 170 C 70 60, 210 60, 280 170 S 490 280, 560 170 S 770 60, 840 170 S 1050 280, 1120 170" fill="none" stroke="rgba(0,136,176,.28)" stroke-width="1" stroke-dasharray="4 5"></path>
+      </svg>
+      <div style="position:absolute;left:0;top:0;bottom:0;width:2px;background:#d6006c;animation:sweep 9s ease-in-out infinite"></div>
+      <div style="position:absolute;right:0;bottom:6px;font:400 13px/1 'Source Serif 4',serif;color:rgba(32,30,29,.5)">one orbit ≈ 4.6 s · −72° · 1.00 m</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid rgba(32,30,29,.12);margin-top:18px">
+      <div style="padding:20px 26px;display:flex;flex-direction:column;gap:14px">
+        <div style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:.24em;text-transform:uppercase;color:#006786">Movement</div>
+        <span style="padding:8px 11px;border:1px solid rgba(32,30,29,.22);background:#fbfafa;font:400 14px/1 'Source Serif 4',serif;border-radius:2px;display:flex;justify-content:space-between;align-items:center">Circular orbit<span style="color:rgba(32,30,29,.4)">▾</span></span>
+        <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 14px/1 'Source Serif 4',serif">Speed</span><span style="font:600 13px/1 'Source Serif 4',serif;color:#006786">0.22 rot/s</span></div><div style="height:3px;background:rgba(32,30,29,.14);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:22%;background:#0088b0"></div><div style="position:absolute;left:22%;top:50%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:#0088b0"></div></div></div>
+        <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 14px/1 'Source Serif 4',serif">Orbit radius</span><span style="font:600 13px/1 'Source Serif 4',serif;color:#006786">1.00 m</span></div><div style="height:3px;background:rgba(32,30,29,.14);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:38%;background:#0088b0"></div><div style="position:absolute;left:38%;top:50%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:#0088b0"></div></div></div>
+      </div>
+      <div style="padding:20px 26px;display:flex;flex-direction:column;gap:14px">
+        <div style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:.24em;text-transform:uppercase;color:#006786">Shape</div>
+        <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 14px/1 'Source Serif 4',serif">Effect depth</span><span style="font:600 13px/1 'Source Serif 4',serif;color:#006786">90%</span></div><div style="height:3px;background:rgba(32,30,29,.14);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:90%;background:#0088b0"></div><div style="position:absolute;left:90%;top:50%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:#0088b0"></div></div></div>
+        <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 14px/1 'Source Serif 4',serif">Smoothness</span><span style="font:600 13px/1 'Source Serif 4',serif;color:#006786">35%</span></div><div style="height:3px;background:rgba(32,30,29,.14);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:35%;background:#0088b0"></div><div style="position:absolute;left:35%;top:50%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:#0088b0"></div></div></div>
+        <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 14px/1 'Source Serif 4',serif">Stereo width</span><span style="font:600 13px/1 'Source Serif 4',serif;color:#006786">115%</span></div><div style="height:3px;background:rgba(32,30,29,.14);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:57%;background:#0088b0"></div><div style="position:absolute;left:57%;top:50%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:#0088b0"></div></div></div>
+      </div>
+      <div style="padding:20px 26px;display:flex;flex-direction:column;gap:14px">
+        <div style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:.24em;text-transform:uppercase;color:#006786">Space</div>
+        <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 14px/1 'Source Serif 4',serif">Reverb</span><span style="font:600 13px/1 'Source Serif 4',serif;color:#006786">18%</span></div><div style="height:3px;background:rgba(32,30,29,.14);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:18%;background:#0088b0"></div><div style="position:absolute;left:18%;top:50%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:#0088b0"></div></div></div>
+        <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 14px/1 'Source Serif 4',serif">Room size</span><span style="font:600 13px/1 'Source Serif 4',serif;color:#006786">60%</span></div><div style="height:3px;background:rgba(32,30,29,.14);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:60%;background:#0088b0"></div><div style="position:absolute;left:60%;top:50%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:#0088b0"></div></div></div>
+        <div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 14px/1 'Source Serif 4',serif">Delay</span><span style="font:600 13px/1 'Source Serif 4',serif;color:rgba(32,30,29,.45)">off</span></div><div style="height:3px;background:rgba(32,30,29,.14);position:relative"><div style="position:absolute;left:0;top:0;bottom:0;width:2%;background:rgba(32,30,29,.3)"></div></div></div>
+      </div>
+      <div style="padding:20px 26px;display:flex;flex-direction:column;gap:11px">
+        <div style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:.24em;text-transform:uppercase;color:#006786">Presets</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <span style="padding:5px 11px;border:1px solid #0088b0;background:rgba(0,136,176,.10);color:#006786;font:600 12px/1 'Source Serif 4',serif;border-radius:2px">Classic 8D</span>
+          <span style="padding:5px 11px;border:1px solid rgba(32,30,29,.2);color:rgba(32,30,29,.7);font:400 12px/1 'Source Serif 4',serif;border-radius:2px">Slow Orbit</span>
+          <span style="padding:5px 11px;border:1px solid rgba(32,30,29,.2);color:rgba(32,30,29,.7);font:400 12px/1 'Source Serif 4',serif;border-radius:2px">Ping-Pong</span>
+          <span style="padding:5px 11px;border:1px solid rgba(32,30,29,.2);color:rgba(32,30,29,.7);font:400 12px/1 'Source Serif 4',serif;border-radius:2px">Wide Cinema</span>
+          <span style="padding:5px 11px;border:1px solid rgba(32,30,29,.2);color:rgba(32,30,29,.7);font:400 12px/1 'Source Serif 4',serif;border-radius:2px">Deep Space</span>
+          <span style="padding:5px 11px;border:1px solid rgba(32,30,29,.2);color:rgba(32,30,29,.7);font:400 12px/1 'Source Serif 4',serif;border-radius:2px">Figure Eight</span>
+        </div>
+        <div style="margin-top:auto;font:400 12.5px/1.4 'Source Serif 4',serif;color:rgba(32,30,29,.5)">Preset applied: Classic 8D</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">Try next: "build out <a class="dv-oid" href="#1a">1a</a> as the main window and add the stopped + no-device states" · "make <a class="dv-oid" href="#1b">1b</a> the default and add a compact/tray mode" · "keep <a class="dv-oid" href="#1c">1c</a>'s strip but put it inside <a class="dv-oid" href="#1a">1a</a>'s rail layout"</p>
+</section>
+</x-dc>
+</body>
+</html>

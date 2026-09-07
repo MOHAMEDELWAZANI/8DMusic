@@ -1,46 +1,80 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="eight_d/assets/8Dcover.png">
-  </picture>
-</p>
-
-
-Real-time 8D spatial audio for **everything your computer plays**. No uploading,
-no converting, no per-file processing — YouTube, Spotify, games, movies, Discord
-and anything else are all spatialised live on their way to your headphones.
-
-<p align="center">
-  <img src="docs/dark.png" width="900"
-       alt="8D Music in dark mode: the orbit visualiser fills the window with the source mid-lap, and the right rail carries the now playing panel above the movement and space controls">
+  <img src="assets/8Dcover.png" alt="8D Music — spatial audio, live">
 </p>
 
 <p align="center">
-  <sub>Dark mode. The rail scrolls — a taller window shows the rest of it.</sub>
+  <img alt="platform: Linux + PipeWire" src="https://img.shields.io/badge/platform-Linux%20%2B%20PipeWire-0E7FA8">
+  <img alt="Python build" src="https://img.shields.io/badge/python-3.9%2B-3776AB">
+  <img alt="C++ build" src="https://img.shields.io/badge/C%2B%2B-20-00599C">
+  <img alt="effect: identical across builds" src="https://img.shields.io/badge/effect-identical%20across%20builds-1C9E63">
 </p>
 
-## Run it
+<p align="center">
+  <b>Real-time 8D spatial audio for everything your computer plays.</b><br>
+  No uploading, no converting, no per-file processing — YouTube, Spotify, games,
+  movies, Discord and anything else are spatialised live on their way to your
+  headphones.
+</p>
+
+---
+
+## Two builds, one effect
+
+The same tool exists twice. The **Python** build came first and is the reference
+implementation; the **C++** build is a rewrite that keeps the effect bit-for-bit
+and rebuilds everything around it.
+
+They are not two different products. Pushed the same audio, they agree to a
+correlation of **1.0000**, with a largest sample difference of 0.0006 — so the
+choice between them is a choice about cost, not about sound.
+
+| | [Python](python/) | [C++](cpp/) |
+| --- | --- | --- |
+| Install | `.venv` with NumPy + SciPy, **271 MB** | one **443 KB** binary |
+| Needs a compiler | no | yes, once |
+| Interface | Tk, hand-drawn | cairo + Pango on X11 |
+| Audio path | virtual sink → `pw-record` → pipe → DSP → pipe → `pw-play` | two native `pw_stream`s, in process |
+| Helper processes while running | 4 | **0** |
+| CPU, audio path | 23.6 % of a core | **2.6 %** |
+| CPU, window open and idle | 20.5 % | **0.5 %** |
+| Memory | 121–135 MB | **37–43 MB** |
+| Arabic text | shaped and reordered by hand in `bidi.py` | Pango, plus fallback for any script |
+
+**Which should you run?** The C++ build, if you can spend one `apt install` and
+17 seconds compiling — it costs about a tenth as much and starts in a tenth the
+time. The Python build if you want to read or change the code quickly, or if a
+compiler is not available. Neither is a downgrade in sound.
+
+<p align="center">
+  <img src="docs/cpp-dark.png" width="900"
+       alt="The C++ build in dark mode: the orbit visualiser fills the left of the window with the source mid-lap, and the right rail carries the now playing panel above the movement controls">
+</p>
+<p align="center"><sub>The C++ build. The rail scrolls — a taller window shows the rest of it.</sub></p>
+
+## Quick start
 
 ```bash
-cd ~/Projects/8DMUSIC
-./run.sh
+git clone git@github.com:MOHAMEDELWAZANI/8DMusic.git
+cd 8DMusic
 ```
 
-The first launch creates a local `.venv` and installs NumPy and SciPy into it;
-after that it starts immediately. Then:
-
-1. Pick your **Device** (the headphones or speakers you actually listen through).
-2. Press **Start**.
-3. Play something. The sound begins orbiting your head.
-
-Press **Stop**, or just close the window, and your audio goes straight back to
-normal.
-
-Useful flags:
+**C++**
 
 ```bash
-./run.sh --check          # verify the system is ready, list outputs
-./run.sh --list-devices   # same thing
+sudo apt install build-essential pkg-config libpipewire-0.3-dev \
+                 libcairo2-dev libx11-dev libpango1.0-dev libsystemd-dev
+cd cpp && make && ./8dmusic
 ```
+
+**Python**
+
+```bash
+cd python && ./run.sh          # first run builds .venv, then it starts at once
+```
+
+Either way: pick your **output device**, press **Start**, and play something.
+Press **Stop**, or close the window, and your audio goes back to normal. Both
+builds accept `--check` to verify the system and list outputs.
 
 ## How it works
 
@@ -48,16 +82,18 @@ The app inserts a virtual output device into the audio graph and makes it the
 system default, so every application ends up playing into it:
 
 ```
-  apps ──▶ [ 8D Music virtual sink ] ──▶ monitor ──▶ DSP ──▶ your speakers
+  apps ──▶ [ 8D Music virtual sink ] ──▶ DSP ──▶ your speakers
 ```
 
-Audio is captured from that sink's monitor, processed, and played out to the
-device you chose. Because the effect sits at the very end of the chain, it
-applies to all sound at once and needs no cooperation from the apps producing it.
+Because the effect sits at the very end of the chain, it applies to all sound at
+once and needs no cooperation from the apps producing it. The virtual sink
+belongs to the running process: if the app is killed — even with `SIGKILL` —
+PipeWire tears the sink down and your previous default device comes back.
 
-The virtual sink is owned by the running process. If the app is killed — even
-with `SIGKILL` — PipeWire tears the sink down and your previous default device
-comes back automatically.
+The two builds differ only in how the audio gets from that sink to the DSP and
+back out. Python carries it through `pw-record` and `pw-play` subprocesses and
+kernel pipes; C++ runs both ends as native `pw_stream`s in one process, with the
+DSP inside PipeWire's realtime callback.
 
 ## The effect
 
@@ -68,7 +104,7 @@ real source would produce:
 | Cue | What it does |
 | --- | --- |
 | **Interaural time difference** | The far ear hears the sound up to ~0.7 ms later. This is what pushes the image outside your head instead of leaving it stuck between your ears. |
-| **Interaural level difference** | Constant-power panning, so the loudness stays steady as the source travels. |
+| **Interaural level difference** | Constant-power panning, so loudness stays steady as the source travels. |
 | **Head shadow** | Your skull blocks high frequencies, so the far ear gets a gentle treble roll-off. |
 | **Front/back cue** | Positions behind you lose a little upper-mid, the way the outer ear shapes sound from the rear. |
 | **Distance** | Level, air absorption and reverb send all follow the orbit radius. |
@@ -76,251 +112,99 @@ real source would produce:
 Delay times and pan gains are interpolated per sample, so nothing clicks or
 zippers while you move the controls.
 
-## Now playing
+**Movement modes** — circular orbit, ping-pong, pendulum, linear sweep, figure
+eight, spiral, random drift, static position.
 
-The top of the rail shows what you are actually listening to — title, artists,
-elapsed time — with skip and play/pause that drive the player itself, not the
-effect. Nothing has to be configured, and nothing leaves the machine.
+**Character** — clean, *slowed & sad* (pitched down), *old radio* (mono,
+band-limited, softly saturated, with tape wow and gated hiss).
 
-<p align="center">
-  <img src="docs/now-playing-dark.png" width="840"
-       alt="The now playing panel in dark mode, twice. Left: Love The Way You Lie by Eminem and Rihanna, set in OffBit, cover reading Er. Right: فكروني by أم كلثوم, set in KO Methlama, running right to left with its letters joined and the cover reading أم">
-</p>
+**Presets** — Classic 8D · Slow Orbit · Ping-Pong · Wide Cinema · Subtle Motion ·
+Extreme Spin · Deep Space · Figure Eight · Slowed & Sad · Old Radio
 
-Two sources feed it:
-
-| Source | What it gives |
-| --- | --- |
-| **MPRIS** | Players publish their track on the session bus. Exact title, artists, length, position and working transport. Spotify, Firefox, Chrome/Brave, VLC, mpv and Rhythmbox all speak it. |
-| **PipeWire** | The playback node's own props, used when a player never registered on the bus. Coarser — usually just the app name. |
-
-Titles are tidied on the way in, because uploaders put far more than the song
-name in them: `Eminem - Love The Way You Lie ft. Rihanna` from a `- Topic`
-channel becomes **Love The Way You Lie** by **Eminem · Rihanna**.
-
-The cover is a lettered tile rather than the real artwork, which players cache
-in formats Tk cannot read. Two artists give their initials — Eminem and Rihanna
-make `Er` — and one artist gives its opening pair, so Eminem alone makes `Em`.
-
-### Arabic
-
-Tk paints a string as a plain left-to-right run of code points. It has no
-bidirectional algorithm and no OpenType shaping, so Arabic arrives backwards and
-with every letter standing alone. `bidi.py` does both jobs before the text
-reaches a widget: it swaps each letter for the contextual form its neighbours
-call for, fuses lam-alef into its single glyph, and reorders the line into the
-order it should be painted — keeping digits running left to right inside it.
-
-The letter forms are read out of `unicodedata` rather than a table pasted into
-the source, so they are whatever the installed Unicode data says. The reordering
-covers the everyday cases of UAX #9; it is not a conformant implementation and
-does not need to be for a one-line label.
-
-Each line is then set in the face that suits its script, since neither bundled
-font covers the other's alphabet:
-
-| Script | Face |
-| --- | --- |
-| Arabic | KO Methlama, from [arfonts.net](https://arfonts.net) |
-| Everything else | OffBit 101 Bold |
-
-Sizes are matched by **ascent** rather than nominal size — KO Methlama carries a
-far larger line gap than OffBit, so equal numbers would draw wildly unequal
-letters — and each row's height is pinned to the taller of the two, so switching
-between an Arabic and a Latin track cannot resize the panel.
-
-`Spotify · captured` on the right means that player's audio is confirmed to be
-flowing through the virtual sink, read from the actual PipeWire links rather
-than from what the stream was merely *asked* to do. Without the word, something
-is playing but not passing through the effect.
-
-## Controls
-
-| Control | What it does |
-| --- | --- |
-| **Movement speed** | How fast the source travels — shown both as orbits/second and seconds per lap. |
-| **Orbit radius** | Virtual distance to the source. Close is louder, brighter and more extreme; far is quieter, darker and wetter. |
-| **Effect depth** | How far through the stereo field it swings. At 0 the source sits still in front of you. |
-| **Smoothness** | Rounds off the motion. Low is mechanical and sharp; high is gradual and natural. |
-| **Movement mode** | See below. |
-| **Stereo width** | Width of the source material before it is placed into the orbit. Below 100% narrows toward mono, above widens. |
-| **Delay** | Cross-fed ping-pong echo — taps bounce ear to ear. |
-| **Reverb** | Freeverb-style room. Room size and damping shape the tail. |
-| **Output volume** | Final gain, ahead of the built-in limiter. |
-
-### Movement modes
-
-- **Circular orbit** — the classic 8D lap around your head.
-- **Ping-pong** — constant-speed sweeps left to right with hard turnarounds.
-- **Pendulum** — sine easing, slowing at the extremes.
-- **Linear sweep** — travels one way, then restarts.
-- **Figure eight** — swings side to side while the distance breathes.
-- **Spiral** — orbits while drifting nearer and further away.
-- **Random drift** — wanders unpredictably, never jumping.
-- **Static position** — parks the source wherever the **Manual position** slider points.
-
-### Presets
-
-Classic 8D · Slow Orbit · Ping-Pong · Wide Cinema · Subtle Motion · Extreme Spin
-· Deep Space · Figure Eight
-
-### Shortcuts
+**Controls** — movement speed, orbit radius, effect depth, smoothness, manual
+position, stereo width, delay (mix / time / feedback), reverb (mix / room size /
+damping), output volume, bypass, reset to defaults.
 
 | Key | Action |
 | --- | --- |
-| `Space` | Bypass / un-bypass the effect (handy for A/B comparison) |
+| `Space` | Bypass / un-bypass, for A/B |
 | `Ctrl+R` | Start / stop the engine |
+| `Ctrl+Shift+R` | Reset every effect setting |
+| `Ctrl+T` | Switch light / dark |
 
-## Tips
+## Now playing
 
-- **Use headphones.** The effect relies on each ear hearing a different signal;
-  speakers blend them together and most of the illusion is lost.
-- Around **0.1 rot/s** (a 10-second lap) is the classic 8D feel. Faster starts to
-  sound like a special effect.
-- If the movement feels seasick, lower **Effect depth** or raise **Smoothness**.
-- **Latency** only affects how quickly control changes are heard. *Balanced* is
-  fine for music and video; drop to *Low* for games, raise to *Safe* if you hear
-  dropouts.
-- Volume keys and the system mixer keep working normally — they act on the
-  virtual sink while the effect runs.
+Both builds show what you are actually listening to — title, artists, elapsed
+time — with skip and play/pause that drive the player itself, not the effect.
+It reads MPRIS from the session bus, so Spotify, Firefox, Chrome/Brave, VLC, mpv
+and Rhythmbox all work with nothing to configure. Nothing leaves the machine.
 
-## Requirements
+<p align="center">
+  <img src="docs/now-playing-dark.png" width="840"
+       alt="The now playing panel in dark mode, twice. Left: Love The Way You Lie by Eminem and Rihanna with a cover reading Er. Right: an Arabic title by أم كلثوم, running right to left with its letters joined and the cover reading أم">
+</p>
 
-- Linux with **PipeWire** (Ubuntu 22.10+, Fedora 34+, and most current distros)
-- Python 3.9 or newer, with Tk
-- NumPy and SciPy — installed automatically into `.venv` on first run
+Titles are tidied on the way in, because uploaders put far more than the song
+name in them: `Eminem - Love The Way You Lie ft. Rihanna` from a `- Topic`
+channel becomes **Love The Way You Lie** by **Eminem · Rihanna**. The cover is a
+lettered tile — two artists give their initials, one artist gives its opening
+pair.
 
-If `./run.sh --check` reports missing pieces:
+Arabic needs shaping and reordering before it can be drawn. The Python build
+does both by hand in [`bidi.py`](python/eight_d/bidi.py), reading the contextual
+letter forms out of `unicodedata`; the C++ build hands the problem to Pango,
+which also covers every other script and falls back when a face lacks a glyph.
+
+## Measured
+
+Full method, spreads and caveats in **[BENCHMARK.md](BENCHMARK.md)** — runs are
+interleaved and reported as medians, on a machine that was explicitly not quiet.
+
+| | Python | C++ | |
+| --- | ---: | ---: | ---: |
+| DSP, share of real time | 12.8–15.7 % | 0.43–0.67 % | **29× faster** |
+| Whole audio path, CPU | 23.6 % | 2.6 % | 9.0× less |
+| Latency added by the effect | 21.7 ms | ~3.5 ms | ~18 ms less |
+| Time to window | 1601 ms | 91 ms | 17.6× faster |
+| CPU idle, window open | 20.5 % | 0.5 % | 41× less |
+| Install size | 271 MB | 443 KB | |
+
+Most of that is architecture rather than language: no helper processes, no
+`pw-dump` polling, and an interface that draws only when something changed. The
+DSP is the one place where the language itself dominates.
 
 ```bash
-sudo apt install pipewire-bin python3-venv python3-tk
+cd cpp/bench
+REPS=5 python3 dsp_bench.py      # the effect itself
+REPS=3 python3 audio_bench.py    # the whole audio path
+REPS=5 python3 latency_bench.py  # delay added by the effect
+REPS=3 python3 gui_bench.py      # the interface
 ```
-
-## Add it to your app menu
-
-<img src="eight_d/assets/icon-128.png" alt="8D Music app icon" width="72" align="right">
-
-```bash
-cp 8dmusic.desktop ~/.local/share/applications/
-```
-
-The launcher takes its icon from `eight_d/assets/`, so the entry shows the mark
-at whatever size your desktop asks for.
-
-## Troubleshooting
-
-**No sound after pressing Start.** Make sure **Device** points at the output you
-actually listen through, not at "8D Music" itself.
-
-**An app is still playing dry.** A few apps pin themselves to a specific output.
-The engine re-checks every two seconds and pulls them in; if one refuses, set its
-output to *8D Music* in your system sound settings.
-
-**"Nothing playing" while music is clearly playing.** Either the player does not
-speak MPRIS, or it is confined by a snap or flatpak and is refusing us. A
-confined player only answers callers whose AppArmor label it recognises, and
-launching 8D Music from an IDE's embedded terminal is enough to fail that check
-— start it from `./run.sh` in a normal terminal, or from the app menu. `busctl`
-must also be installed; without it only the PipeWire fallback runs.
-
-**Crackling or dropouts.** Set **Latency** to *Safe*. The status line shows the
-CPU cost per block — sustained readings near 100% mean the machine can't keep up.
-
-**The app crashed and my audio is odd.** It shouldn't persist: the virtual sink
-dies with the process. If your default output is wrong, reset it in system sound
-settings.
 
 ## Layout
 
 ```
-eight_d/
-  dsp.py        the spatial engine — orbit paths, ITD/ILD, head shadow, delay, reverb
-  engine.py     the real-time thread and the pw-record → DSP → pw-play pipeline
-  pipewire.py   virtual sink creation, stream routing, restoring things afterwards
-  nowplaying.py track detection over MPRIS, with a PipeWire fallback
-  bidi.py       Arabic shaping and right-to-left reordering, which Tk lacks
-  fonts.py      makes the bundled faces visible to Tk, without installing them
-  ui.py         the desktop interface and orbit visualiser
-  config.py     settings persistence (~/.config/8dmusic/settings.json)
-  assets/       app icons and the logo lockup
-  assets/fonts/ the two bundled faces
-docs/
-  dark.png, now-playing-dark.png   the images above
-tools/
-  make_icons.py       regenerates everything in assets/ from the logo geometry
-  make_arabic_font.py rebuilds the bundled Arabic face (see below)
-  make_screenshots.py re-renders docs/ from the design mockups
+8DMusic/
+├── README.md            this file
+├── BENCHMARK.md         how the two builds compare, and how that was measured
+├── assets/              cover and logo lockups
+├── docs/                screenshots, and the UI exports under docs/design/
+├── python/              the reference build — see python/README.md
+│   ├── eight_d/         dsp, engine, pipewire, ui, nowplaying, bidi
+│   └── run.sh
+└── cpp/                 the rewrite — see cpp/README.md
+    ├── src/dsp/         the effect, allocation-free
+    ├── src/audio/       PipeWire graph, engine, MPRIS over sd-bus
+    ├── src/ui/          X11 + cairo + Pango
+    └── bench/           the benchmark harness
 ```
 
-### The images
+## Requirements
 
-They are rendered from the mockups in `8D Audio Effect Tool UI`, not captured
-from a running window: this is a Tk app on a Wayland desktop, where the
-compositor hands window grabs to its own portal only, so there is no way to
-photograph it unattended. The mockups are the layout the interface was built to
-and the panel is composed from the widget's own measurements, so the pictures
-are honest about the design — with the caveat that Tk fakes the gradients, blur
-and rounded corners the browser draws for real.
+Linux with **PipeWire** — Ubuntu 22.10+, Fedora 34+ and most current distros.
+Use **headphones**: the effect relies on each ear hearing a different signal, and
+speakers blend them together.
 
-```bash
-python3 tools/make_screenshots.py
-```
+## Roadmap
 
-Needs a Chromium-family browser to rasterise, and nothing else.
-
-### The bundled Arabic face
-
-An Arabic font keeps one glyph per letter *shape* and an OpenType engine picks
-between them while laying the line out. Tk has no such engine — it can only look
-a character up in the font's `cmap` — so it can never reach the joined shapes,
-and KO Methlama maps none of them.
-
-`tools/make_arabic_font.py` reads the substitutions out of the font's own GSUB
-table and writes `cmap` entries pointing at the glyphs the designer already
-drew, making them addressable by code point. No outline is touched and nothing
-is redrawn; the result is the same font with a fuller index, renamed so it can
-never be confused with the original. It only needs re-running if the source font
-changes:
-
-```bash
-.venv/bin/pip install fonttools
-.venv/bin/python tools/make_arabic_font.py
-```
-
-fontTools is a tool-time dependency only — the app itself never imports it.
-
-Both faces are reached through a generated fontconfig file that includes the
-system configuration and adds `assets/fonts/`. Nothing is written to your font
-directories and nothing is registered system-wide. If any of that is unavailable
-the interface quietly falls back to the fonts the system already has, and the
-right-to-left fix still applies.
-
-## Identity
-
-The mark is four level bars — the sound itself — seated on a baseline, with an
-arc sweeping beneath them for the orbit passing under the listener, and a dot
-marking where the source is. Bars drop away as the icon gets smaller: four at
-128 px and up, three at 64 and 32, two at 16.
-
-<p align="center">
-  <img src="eight_d/assets/icon-128.png" alt="" width="96">&nbsp;&nbsp;
-  <img src="eight_d/assets/icon-64.png" alt="" width="64">&nbsp;&nbsp;
-  <img src="eight_d/assets/icon-32.png" alt="" width="32">&nbsp;&nbsp;
-  <img src="eight_d/assets/icon-16.png" alt="" width="16">
-</p>
-
-| | |
-| --- | --- |
-| `#0088B0` | accent — the sweep, active controls, section headings |
-| `#D6006C` | the source dot, and the transport when it is running |
-| `#201E1D` | ink |
-| `#F3F2F2` | ground |
-
-Everything in `eight_d/assets/` is generated. If the mark changes, edit the
-geometry at the top of `tools/make_icons.py` and re-run it (it needs Pillow,
-which the app itself does not):
-
-```bash
-.venv/bin/pip install pillow
-.venv/bin/python tools/make_icons.py
-```
+A **mobile** build is next, and will sit alongside these two.

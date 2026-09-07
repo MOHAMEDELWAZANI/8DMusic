@@ -1341,6 +1341,7 @@ class App(tk.Tk):
         self.bind("<space>", lambda _: self.toggle_bypass())
         self.bind("<Control-r>", lambda _: self.toggle_engine())
         self.bind("<Control-t>", lambda _: self.toggle_theme())
+        self.bind("<Control-Shift-R>", lambda _: self.reset_settings())
 
         missing = pw.missing_tools()
         if missing:
@@ -1561,6 +1562,9 @@ class App(tk.Tk):
                 return
             canvas.yview_scroll(-1 if event.num == 4 else 1, "units")
 
+        # Kept so tooling (tools/export_ui.py) can scroll the rail while capturing.
+        self._rail_canvas = canvas
+
         rail.bind("<Configure>", on_content)
         canvas.bind("<Configure>", on_canvas)
         hint.bind("<Configure>", lambda _: hint.update_span(*canvas.yview()))
@@ -1710,6 +1714,13 @@ class App(tk.Tk):
                                    fmt=pct)
         self.s_gain.pack(fill="x")
 
+        self.reset_button = PressButton(
+            out, "Reset to defaults", self.reset_settings,
+            bg="FIELD", fg="INK_SOFT", hover="ACCENT_SOFT",
+            font=fonts["ghost"], padx=11, pady=10)
+        self.reset_button.pack(fill="x", pady=(px(16), 0))
+        self._themed.append(self.reset_button)
+
     def _block(self, rail, title, pady):
         wrapper = tk.Frame(rail, bd=0, highlightthickness=0)
         wrapper.pack(fill="x", pady=tuple(px(v) for v in pady))
@@ -1783,6 +1794,18 @@ class App(tk.Tk):
         self._sync_widgets(params)
         self.stage.set_active_preset(name)
         self.set_status(f"Preset applied: {name}", "note")
+
+    def reset_settings(self):
+        """Put every effect control back to its factory default.
+
+        The output device and latency are deliberately left alone: they
+        describe the hardware you are listening on, not the effect.
+        """
+        params = Params()
+        self.engine.set_params(params)
+        self._sync_widgets(params)
+        self.stage.set_active_preset(None)
+        self.set_status("Reset — every effect setting is back to its default.", "note")
 
     def _sync_widgets(self, p: Params):
         self.mode_box.set(MODE_LABELS.get(p.mode, MODE_LABELS["circular"]))

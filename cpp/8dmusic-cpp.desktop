@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=8D Music (C++)
+GenericName=Spatial Audio Effect
+Comment=Apply a real-time 8D spatial effect to all system audio
+Exec=/home/mohamedwazane/Projects/8DMUSIC/cpp/8dmusic
+Path=/home/mohamedwazane/Projects/8DMUSIC/cpp
+Icon=audio-headphones
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+Keywords=8d;audio;spatial;surround;headphones;
+StartupNotify=true

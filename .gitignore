@@ -1,25 +1,16 @@
-# Python
+# python build
+python/.venv/
 __pycache__/
-*.py[cod]
-*.egg-info/
-build/
-dist/
-tools/
-# The virtualenv run.sh creates on first launch
-.venv/
+*.pyc
 
-# Editors and tools
+# c++ build
+cpp/build/
+cpp/8dmusic
+cpp/bench/dsp_probe
+cpp/tests/engine_probe_bin
+*.o
+*.d
+
+# editors / local
 .idea/
-.vscode/
-.claude/settings.local.json
-
-# Design exports from claude.ai/design.  The identity itself lives in
-# tools/make_icons.py and eight_d/assets/, so these are reference material
-# rather than source -- drop these three lines if you want them versioned.
-/8D Audio Effect Tool UI/
-/8D Audio Effect Tool UI.zip
-/*.dc.html
-# Scratch
-*.tmp
-*.xwd
-
+.claude/

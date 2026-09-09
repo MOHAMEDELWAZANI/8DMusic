@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+  body { margin:0; background:#e4e2e2; font-family:"Source Serif 4",Georgia,serif; }
+  a { color:#0088b0; text-decoration:none; }
+  a:hover { color:#006786; }
+  select { -webkit-appearance:none; appearance:none; }
+  ::selection { background:#cbeeff; }
+  *:focus-visible { outline:2px solid #0088b0; outline-offset:2px; }
+</style>
+</helmet>
+<div style="min-height:100vh;display:flex;align-items:flex-start;justify-content:center;gap:32px;padding:40px 18px 56px;flex-wrap:wrap">
+
+<div style="display:flex;flex-direction:column;gap:18px;flex:none">
+  <div style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#605d5d">LIGHT · PAPER</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ 402 }}" height="{{ 874 }}" style="width:402px;height:874px;flex:none" hint-size="402px,874px">
+<div style="padding:58px 0 44px;background:#f3f2f2;color:#201e1d;font-family:'Source Serif 4',Georgia,serif">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 20px 14px">
+    <div style="display:flex;align-items:center;gap:9px">
+      <svg width="26" height="26" viewBox="0 0 512 512" role="img" aria-label="8D Music">
+        <rect x="148" y="200" width="44" height="92" rx="22" fill="#201e1d"></rect>
+        <rect x="211" y="143" width="44" height="149" rx="22" fill="#201e1d"></rect>
+        <rect x="274" y="175" width="44" height="117" rx="22" fill="#201e1d"></rect>
+        <rect x="339" y="228" width="44" height="64" rx="22" fill="#201e1d"></rect>
+        <path d="M100 316 C 170 382, 342 382, 408 320" fill="none" stroke="#0088b0" stroke-width="30" stroke-linecap="round"></path>
+        <circle cx="410" cy="320" r="30" fill="#d6006c"></circle>
+      </svg>
+      <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#605d5d;white-space:nowrap">8D MUSIC</span>
+    </div>
+    <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.16em;color:#9b9797;white-space:nowrap">SPATIAL AUDIO</span>
+  </div>
+
+  <div style="padding:0 20px 6px">
+    <h1 style="margin:0;font:600 40px/0.95 'Source Serif 4',serif;letter-spacing:-0.01em">8D Music</h1>
+    <p style="margin:8px 0 0;font:400 15px/1.35 'Source Serif 4',serif;color:#605d5d;max-width:30ch;text-wrap:pretty">Real-time spatial audio for everything your phone plays</p>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:12px">
+      <span ref="{{ statusDotRefA }}" style="width:7px;height:7px;border-radius:50%;background:#9b9797"></span>
+      <span ref="{{ statusRefA }}" style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.16em;color:#7d7979">READY</span>
+    </div>
+  </div>
+
+  <div style="position:relative;width:362px;height:362px;margin:6px auto 0">
+    <div style="position:absolute;inset:0;border:1px solid #d7d3d3;border-radius:50%"></div>
+    <div style="position:absolute;inset:56px;border:1px solid #dfdbdb;border-radius:50%"></div>
+    <div style="position:absolute;left:50%;top:8px;bottom:8px;width:1px;background:#dfdbdb"></div>
+    <div style="position:absolute;top:50%;left:8px;right:8px;height:1px;background:#dfdbdb"></div>
+    <div ref="{{ orbitRefA }}" style="position:absolute;left:50%;top:50%;width:200px;height:200px;margin:-100px 0 0 -100px;border:1px dashed #38a6cf;border-radius:50%;opacity:0.85"></div>
+    <div style="position:absolute;left:50%;top:50%;width:66px;height:66px;margin:-33px 0 0 -33px;border:1px solid #bab6b6;border-radius:50%"></div>
+    <div style="position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border:1px solid #bab6b6;border-radius:50%"></div>
+    <div style="position:absolute;left:50%;top:50%;width:0;height:0;margin:-7px 0 0 -5px;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:9px solid #7d7979"></div>
+    <div ref="{{ trail1RefA }}" style="position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#bab6b6;opacity:0.45"></div>
+    <div ref="{{ trail2RefA }}" style="position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;background:#cfcbcb;opacity:0.35"></div>
+    <div ref="{{ dotRefA }}" style="position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:#7d7979"></div>
+    <span style="position:absolute;left:50%;top:0;transform:translateX(-50%);font:400 10px/1 'Source Serif 4',serif;letter-spacing:0.2em;color:#9b9797;background:#f3f2f2;padding:0 6px">FRONT</span>
+    <span style="position:absolute;left:50%;bottom:0;transform:translateX(-50%);font:400 10px/1 'Source Serif 4',serif;letter-spacing:0.2em;color:#9b9797;background:#f3f2f2;padding:0 6px">BACK</span>
+    <span style="position:absolute;left:0;top:50%;transform:translateY(-50%);font:400 10px/1 'Source Serif 4',serif;color:#9b9797;background:#f3f2f2;padding:4px 0">L</span>
+    <span style="position:absolute;right:0;top:50%;transform:translateY(-50%);font:400 10px/1 'Source Serif 4',serif;color:#9b9797;background:#f3f2f2;padding:4px 0">R</span>
+  </div>
+
+  <div style="display:flex;align-items:flex-end;gap:16px;padding:14px 20px 0">
+    <div style="display:flex;align-items:baseline;gap:14px;flex:1;min-width:0">
+      <span ref="{{ angleRefA }}" style="font:600 15px/1 'Source Serif 4',serif;color:#0088b0">+0°</span>
+      <span ref="{{ distRefA }}" style="font:400 15px/1 'Source Serif 4',serif;color:#605d5d">1.00 m</span>
+      <span ref="{{ sideRefA }}" style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">centre</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px;width:120px">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font:400 10px/1 'Source Serif 4',serif;color:#9b9797">L</span>
+        <div style="position:relative;flex:1;height:3px;background:#dfdbdb">
+          <div ref="{{ lRefA }}" style="position:absolute;inset:0;width:50%;background:#bab6b6"></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font:400 10px/1 'Source Serif 4',serif;color:#9b9797">R</span>
+        <div style="position:relative;flex:1;height:3px;background:#dfdbdb">
+          <div ref="{{ rRefA }}" style="position:absolute;inset:0;width:50%;background:#bab6b6"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:1px;background:#dfdbdb;margin:22px 20px 0"></div>
+
+  <div style="padding:20px 20px 0">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+      <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#0088b0">NOW PLAYING</span>
+      <span style="font:400 13px/1 'Source Serif 4',serif;color:#7d7979">System audio</span>
+    </div>
+    <div style="display:flex;gap:14px;margin-top:14px">
+      <div style="width:64px;height:64px;flex:none;background:#201e1d;display:flex;align-items:center;justify-content:center">
+        <span style="font:400 22px/1 'Source Serif 4',serif;color:#f3f2f2">Le</span>
+      </div>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+        <div style="font:600 19px/1.1 'Source Serif 4',serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Khayi</div>
+        <div style="font:400 15px/1.1 'Source Serif 4',serif;color:#605d5d">Lemchaheb</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:2px">
+          <span ref="{{ elapsedRefA }}" style="font:400 12px/1 'Source Serif 4',serif;color:#7d7979">3:08</span>
+          <div onPointerDown="{{ onSeek }}" style="position:relative;flex:1;height:20px;display:flex;align-items:center;touch-action:none;cursor:pointer">
+            <div style="position:absolute;left:0;right:0;height:3px;background:#d7d3d3"></div>
+            <div ref="{{ progRefA }}" style="position:absolute;left:0;height:3px;width:50%;background:#d6006c"></div>
+            <div ref="{{ progThumbRefA }}" style="position:absolute;left:50%;width:13px;height:13px;margin-left:-6.5px;border-radius:50%;background:#d6006c"></div>
+          </div>
+          <span style="font:400 12px/1 'Source Serif 4',serif;color:#7d7979">6:16</span>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:18px">
+      <button onClick="{{ onPrev }}" aria-label="Previous" style="flex:none;width:52px;height:48px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid #d7d3d3;border-radius:2px;cursor:pointer" style-hover="background:#eae9e9" style-active="background:#dfdbdb">
+        <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><rect x="0" y="1" width="2.4" height="12" fill="#201e1d"></rect><path d="M17 1 L17 13 L5 7 Z" fill="#201e1d"></path></svg>
+      </button>
+      <button onClick="{{ onPlayPause }}" aria-label="Play or pause" style="flex:none;width:52px;height:48px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid #d7d3d3;border-radius:2px;cursor:pointer" style-hover="background:#eae9e9" style-active="background:#dfdbdb">
+        <span ref="{{ playIconRefA }}" style="display:block">
+          <svg width="16" height="14" viewBox="0 0 16 14" aria-hidden="true"><rect x="2" y="1" width="3.6" height="12" fill="#201e1d"></rect><rect x="10" y="1" width="3.6" height="12" fill="#201e1d"></rect></svg>
+        </span>
+      </button>
+      <button onClick="{{ onNext }}" aria-label="Next" style="flex:none;width:52px;height:48px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid #d7d3d3;border-radius:2px;cursor:pointer" style-hover="background:#eae9e9" style-active="background:#dfdbdb">
+        <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1 L1 13 L13 7 Z" fill="#201e1d"></path><rect x="15.6" y="1" width="2.4" height="12" fill="#201e1d"></rect></svg>
+      </button>
+      <button onClick="{{ onEngine }}" style="{{ engineStyleA }}" style-active="opacity:0.85">{{ engineLabel }}</button>
+    </div>
+  </div>
+
+  <sc-if value="{{ presetsOn }}" hint-placeholder-val="{{ true }}">
+    <div style="margin-top:26px">
+      <div style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#0088b0;padding:0 20px 12px">PRESETS</div>
+      <div style="display:flex;gap:8px;overflow-x:auto;padding:0 20px 4px;scrollbar-width:none">
+        <sc-for list="{{ presetsA }}" as="p" hint-placeholder-count="5">
+          <button onClick="{{ p.onClick }}" style="{{ p.style }}">{{ p.name }}</button>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <div style="margin-top:26px;position:sticky;top:52px;background:#f3f2f2;z-index:5;padding:6px 0 0">
+    <div style="display:flex;gap:0;padding:0 20px;border-bottom:1px solid #dfdbdb">
+      <sc-for list="{{ tabsA }}" as="t" hint-placeholder-count="4">
+        <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.name }}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="padding:22px 20px 0;display:flex;flex-direction:column;gap:22px">
+    <sc-for list="{{ selects }}" as="sel" hint-placeholder-count="1">
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <span style="font:400 13px/1 'Source Serif 4',serif;color:#605d5d">{{ sel.label }}</span>
+        <div style="position:relative">
+          <select value="{{ sel.value }}" onChange="{{ sel.onChange }}" style="width:100%;height:48px;padding:0 38px 0 12px;font:400 16px/1 'Source Serif 4',serif;color:#201e1d;background:#f8f4f4;border:1px solid #bab6b6;border-radius:2px">
+            <sc-for list="{{ sel.options }}" as="o" hint-placeholder-count="3">
+              <option value="{{ o }}">{{ o }}</option>
+            </sc-for>
+          </select>
+          <span style="position:absolute;right:13px;top:50%;transform:translateY(-50%);pointer-events:none;font:400 10px/1 'Source Serif 4',serif;color:#605d5d">▼</span>
+        </div>
+      </div>
+    </sc-for>
+
+    <sc-for list="{{ slidersA }}" as="s" hint-placeholder-count="4">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+          <span style="{{ s.labelStyle }}">{{ s.label }}</span>
+          <span style="{{ s.valueStyle }}">{{ s.display }}</span>
+        </div>
+        <div onPointerDown="{{ s.onDown }}" onPointerMove="{{ s.onMove }}" style="position:relative;height:34px;display:flex;align-items:center;touch-action:none;cursor:pointer">
+          <div style="position:absolute;left:0;right:0;height:3px;background:#d7d3d3;border-radius:2px"></div>
+          <div style="{{ s.fillStyle }}"></div>
+          <div style="{{ s.thumbStyle }}"></div>
+        </div>
+        <sc-if value="{{ s.hint }}" hint-placeholder-val="{{ false }}">
+          <span style="font:400 13px/1.35 'Source Serif 4',serif;color:#7d7979;text-wrap:pretty">{{ s.hint }}</span>
+        </sc-if>
+      </div>
+    </sc-for>
+
+    <sc-for list="{{ togglesA }}" as="t" hint-placeholder-count="1">
+      <label style="display:flex;align-items:center;gap:12px;min-height:44px;cursor:pointer">
+        <span style="{{ t.boxStyle }}">{{ t.mark }}</span>
+        <span style="font:400 16px/1.3 'Source Serif 4',serif">{{ t.label }}</span>
+        <input type="checkbox" checked="{{ t.checked }}" onChange="{{ t.onChange }}" style="position:absolute;opacity:0;width:1px;height:1px">
+      </label>
+    </sc-for>
+
+    <button onClick="{{ onReset }}" style="height:48px;width:100%;font:400 16px/1 'Source Serif 4',serif;color:#605d5d;background:#eae9e9;border:1px solid #d7d3d3;border-radius:2px;cursor:pointer" style-hover="background:#dfdbdb" style-active="background:#d7d3d3">Reset to defaults</button>
+  </div>
+</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:18px;flex:none">
+  <div style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#605d5d">DARK · INK</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ 402 }}" height="{{ 874 }}" dark="{{ true }}" style="width:402px;height:874px;flex:none" hint-size="402px,874px">
+<div style="padding:58px 0 44px;background:#1a1918;color:#f3f2f2;font-family:'Source Serif 4',Georgia,serif">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 20px 14px">
+    <div style="display:flex;align-items:center;gap:9px">
+      <svg width="26" height="26" viewBox="0 0 512 512" role="img" aria-label="8D Music">
+        <rect x="148" y="200" width="44" height="92" rx="22" fill="#f3f2f2"></rect>
+        <rect x="211" y="143" width="44" height="149" rx="22" fill="#f3f2f2"></rect>
+        <rect x="274" y="175" width="44" height="117" rx="22" fill="#f3f2f2"></rect>
+        <rect x="339" y="228" width="44" height="64" rx="22" fill="#f3f2f2"></rect>
+        <path d="M104 320 C 170 382, 342 382, 412 316" fill="none" stroke="#62c5ee" stroke-width="30" stroke-linecap="round"></path>
+        <circle cx="102" cy="318" r="30" fill="#ff458e"></circle>
+      </svg>
+      <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#bab6b6;white-space:nowrap">8D MUSIC</span>
+    </div>
+    <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.16em;color:#7d7979;white-space:nowrap">SPATIAL AUDIO</span>
+  </div>
+
+  <div style="padding:0 20px 6px">
+    <h1 style="margin:0;font:600 40px/0.95 'Source Serif 4',serif;letter-spacing:-0.01em">8D Music</h1>
+    <p style="margin:8px 0 0;font:400 15px/1.35 'Source Serif 4',serif;color:#bab6b6;max-width:30ch;text-wrap:pretty">Real-time spatial audio for everything your phone plays</p>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:12px">
+      <span ref="{{ statusDotRefB }}" style="width:7px;height:7px;border-radius:50%;background:#605d5d"></span>
+      <span ref="{{ statusRefB }}" style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.16em;color:#9b9797">READY</span>
+    </div>
+  </div>
+
+  <div style="position:relative;width:362px;height:362px;margin:6px auto 0">
+    <div style="position:absolute;inset:0;border:1px solid #403d3c;border-radius:50%"></div>
+    <div style="position:absolute;inset:56px;border:1px solid #332f2f;border-radius:50%"></div>
+    <div style="position:absolute;left:50%;top:8px;bottom:8px;width:1px;background:#332f2f"></div>
+    <div style="position:absolute;top:50%;left:8px;right:8px;height:1px;background:#332f2f"></div>
+    <div ref="{{ orbitRefB }}" style="position:absolute;left:50%;top:50%;width:200px;height:200px;margin:-100px 0 0 -100px;border:1px dashed #62c5ee;border-radius:50%;opacity:0.85"></div>
+    <div style="position:absolute;left:50%;top:50%;width:66px;height:66px;margin:-33px 0 0 -33px;border:1px solid #605d5d;border-radius:50%"></div>
+    <div style="position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border:1px solid #605d5d;border-radius:50%"></div>
+    <div style="position:absolute;left:50%;top:50%;width:0;height:0;margin:-7px 0 0 -5px;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:9px solid #9b9797"></div>
+    <div ref="{{ trail1RefB }}" style="position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#7d7979;opacity:0.45"></div>
+    <div ref="{{ trail2RefB }}" style="position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;background:#605d5d;opacity:0.35"></div>
+    <div ref="{{ dotRefB }}" style="position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:#9b9797"></div>
+    <span style="position:absolute;left:50%;top:0;transform:translateX(-50%);font:400 10px/1 'Source Serif 4',serif;letter-spacing:0.2em;color:#7d7979;background:#1a1918;padding:0 6px">FRONT</span>
+    <span style="position:absolute;left:50%;bottom:0;transform:translateX(-50%);font:400 10px/1 'Source Serif 4',serif;letter-spacing:0.2em;color:#7d7979;background:#1a1918;padding:0 6px">BACK</span>
+    <span style="position:absolute;left:0;top:50%;transform:translateY(-50%);font:400 10px/1 'Source Serif 4',serif;color:#7d7979;background:#1a1918;padding:4px 0">L</span>
+    <span style="position:absolute;right:0;top:50%;transform:translateY(-50%);font:400 10px/1 'Source Serif 4',serif;color:#7d7979;background:#1a1918;padding:4px 0">R</span>
+  </div>
+
+  <div style="display:flex;align-items:flex-end;gap:16px;padding:14px 20px 0">
+    <div style="display:flex;align-items:baseline;gap:14px;flex:1;min-width:0">
+      <span ref="{{ angleRefB }}" style="font:600 15px/1 'Source Serif 4',serif;color:#62c5ee">+0°</span>
+      <span ref="{{ distRefB }}" style="font:400 15px/1 'Source Serif 4',serif;color:#bab6b6">1.00 m</span>
+      <span ref="{{ sideRefB }}" style="font:400 15px/1 'Source Serif 4',serif;color:#9b9797">centre</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px;width:120px">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font:400 10px/1 'Source Serif 4',serif;color:#7d7979">L</span>
+        <div style="position:relative;flex:1;height:3px;background:#332f2f">
+          <div ref="{{ lRefB }}" style="position:absolute;inset:0;width:50%;background:#605d5d"></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font:400 10px/1 'Source Serif 4',serif;color:#7d7979">R</span>
+        <div style="position:relative;flex:1;height:3px;background:#332f2f">
+          <div ref="{{ rRefB }}" style="position:absolute;inset:0;width:50%;background:#605d5d"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:1px;background:#332f2f;margin:22px 20px 0"></div>
+
+  <div style="padding:20px 20px 0">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+      <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#62c5ee">NOW PLAYING</span>
+      <span style="font:400 13px/1 'Source Serif 4',serif;color:#9b9797">System audio</span>
+    </div>
+    <div style="display:flex;gap:14px;margin-top:14px">
+      <div style="width:64px;height:64px;flex:none;background:#f3f2f2;display:flex;align-items:center;justify-content:center">
+        <span style="font:400 22px/1 'Source Serif 4',serif;color:#201e1d">Le</span>
+      </div>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+        <div style="font:600 19px/1.1 'Source Serif 4',serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Khayi</div>
+        <div style="font:400 15px/1.1 'Source Serif 4',serif;color:#bab6b6">Lemchaheb</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:2px">
+          <span ref="{{ elapsedRefB }}" style="font:400 12px/1 'Source Serif 4',serif;color:#9b9797">3:08</span>
+          <div onPointerDown="{{ onSeek }}" style="position:relative;flex:1;height:20px;display:flex;align-items:center;touch-action:none;cursor:pointer">
+            <div style="position:absolute;left:0;right:0;height:3px;background:#403d3c"></div>
+            <div ref="{{ progRefB }}" style="position:absolute;left:0;height:3px;width:50%;background:#ff458e"></div>
+            <div ref="{{ progThumbRefB }}" style="position:absolute;left:50%;width:13px;height:13px;margin-left:-6.5px;border-radius:50%;background:#ff458e"></div>
+          </div>
+          <span style="font:400 12px/1 'Source Serif 4',serif;color:#9b9797">6:16</span>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:18px">
+      <button onClick="{{ onPrev }}" aria-label="Previous" style="flex:none;width:52px;height:48px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid #403d3c;border-radius:2px;cursor:pointer" style-hover="background:#262423" style-active="background:#332f2f">
+        <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><rect x="0" y="1" width="2.4" height="12" fill="#f3f2f2"></rect><path d="M17 1 L17 13 L5 7 Z" fill="#f3f2f2"></path></svg>
+      </button>
+      <button onClick="{{ onPlayPause }}" aria-label="Play or pause" style="flex:none;width:52px;height:48px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid #403d3c;border-radius:2px;cursor:pointer" style-hover="background:#262423" style-active="background:#332f2f">
+        <span ref="{{ playIconRefB }}" style="display:block">
+          <svg width="16" height="14" viewBox="0 0 16 14" aria-hidden="true"><rect x="2" y="1" width="3.6" height="12" fill="#f3f2f2"></rect><rect x="10" y="1" width="3.6" height="12" fill="#f3f2f2"></rect></svg>
+        </span>
+      </button>
+      <button onClick="{{ onNext }}" aria-label="Next" style="flex:none;width:52px;height:48px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid #403d3c;border-radius:2px;cursor:pointer" style-hover="background:#262423" style-active="background:#332f2f">
+        <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1 L1 13 L13 7 Z" fill="#f3f2f2"></path><rect x="15.6" y="1" width="2.4" height="12" fill="#f3f2f2"></rect></svg>
+      </button>
+      <button onClick="{{ onEngine }}" style="{{ engineStyleB }}" style-active="opacity:0.85">{{ engineLabel }}</button>
+    </div>
+  </div>
+
+  <sc-if value="{{ presetsOn }}" hint-placeholder-val="{{ true }}">
+    <div style="margin-top:26px">
+      <div style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#62c5ee;padding:0 20px 12px">PRESETS</div>
+      <div style="display:flex;gap:8px;overflow-x:auto;padding:0 20px 4px;scrollbar-width:none">
+        <sc-for list="{{ presetsB }}" as="p" hint-placeholder-count="5">
+          <button onClick="{{ p.onClick }}" style="{{ p.style }}">{{ p.name }}</button>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <div style="margin-top:26px;position:sticky;top:52px;background:#1a1918;z-index:5;padding:6px 0 0">
+    <div style="display:flex;gap:0;padding:0 20px;border-bottom:1px solid #332f2f">
+      <sc-for list="{{ tabsB }}" as="t" hint-placeholder-count="4">
+        <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.name }}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="padding:22px 20px 0;display:flex;flex-direction:column;gap:22px">
+    <sc-for list="{{ selects }}" as="sel" hint-placeholder-count="1">
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <span style="font:400 13px/1 'Source Serif 4',serif;color:#bab6b6">{{ sel.label }}</span>
+        <div style="position:relative">
+          <select value="{{ sel.value }}" onChange="{{ sel.onChange }}" style="width:100%;height:48px;padding:0 38px 0 12px;font:400 16px/1 'Source Serif 4',serif;color:#f3f2f2;background:#262423;border:1px solid #605d5d;border-radius:2px">
+            <sc-for list="{{ sel.options }}" as="o" hint-placeholder-count="3">
+              <option value="{{ o }}">{{ o }}</option>
+            </sc-for>
+          </select>
+          <span style="position:absolute;right:13px;top:50%;transform:translateY(-50%);pointer-events:none;font:400 10px/1 'Source Serif 4',serif;color:#bab6b6">▼</span>
+        </div>
+      </div>
+    </sc-for>
+
+    <sc-for list="{{ slidersB }}" as="s" hint-placeholder-count="4">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+          <span style="{{ s.labelStyle }}">{{ s.label }}</span>
+          <span style="{{ s.valueStyle }}">{{ s.display }}</span>
+        </div>
+        <div onPointerDown="{{ s.onDown }}" onPointerMove="{{ s.onMove }}" style="position:relative;height:34px;display:flex;align-items:center;touch-action:none;cursor:pointer">
+          <div style="position:absolute;left:0;right:0;height:3px;background:#403d3c;border-radius:2px"></div>
+          <div style="{{ s.fillStyle }}"></div>
+          <div style="{{ s.thumbStyle }}"></div>
+        </div>
+        <sc-if value="{{ s.hint }}" hint-placeholder-val="{{ false }}">
+          <span style="font:400 13px/1.35 'Source Serif 4',serif;color:#9b9797;text-wrap:pretty">{{ s.hint }}</span>
+        </sc-if>
+      </div>
+    </sc-for>
+
+    <sc-for list="{{ togglesB }}" as="t" hint-placeholder-count="1">
+      <label style="display:flex;align-items:center;gap:12px;min-height:44px;cursor:pointer">
+        <span style="{{ t.boxStyle }}">{{ t.mark }}</span>
+        <span style="font:400 16px/1.3 'Source Serif 4',serif">{{ t.label }}</span>
+        <input type="checkbox" checked="{{ t.checked }}" onChange="{{ t.onChange }}" style="position:absolute;opacity:0;width:1px;height:1px">
+      </label>
+    </sc-for>
+
+    <button onClick="{{ onReset }}" style="height:48px;width:100%;font:400 16px/1 'Source Serif 4',serif;color:#bab6b6;background:#262423;border:1px solid #403d3c;border-radius:2px;cursor:pointer" style-hover="background:#332f2f" style-active="background:#403d3c">Reset to defaults</button>
+  </div>
+</div>
+</x-import>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1060,&quot;height&quot;:1010},&quot;defaultTab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Movement&quot;,&quot;Character&quot;,&quot;Space&quot;,&quot;Output&quot;],&quot;default&quot;:&quot;Movement&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;showPresets&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;orbitTrail&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const DEFAULTS = {
+  speed: 0.12, radius: 1.0, depth: 85, smooth: 35, manual: 0,
+  charAmt: 100, width: 100, delay: 0, reverb: 18, delayTime: 280,
+  room: 60, feedback: 35, damping: 45, volume: 90
+};
+const PRESETS = {
+  'Classic 8D':   { speed: 0.12, radius: 1.0, depth: 85, smooth: 35, mode: 'Circular orbit', dir: 'Clockwise' },
+  'Slow Orbit':   { speed: 0.05, radius: 1.4, depth: 70, smooth: 60, mode: 'Circular orbit', dir: 'Clockwise' },
+  'Ping-Pong':    { speed: 0.30, radius: 0.8, depth: 95, smooth: 15, mode: 'Left–right sweep', dir: 'Clockwise' },
+  'Wide Cinema':  { speed: 0.08, radius: 2.0, depth: 60, smooth: 55, mode: 'Circular orbit', dir: 'Counter-clockwise' },
+  'Subtle Motion':{ speed: 0.06, radius: 0.7, depth: 35, smooth: 70, mode: 'Circular orbit', dir: 'Clockwise' },
+  'Extreme Spin': { speed: 0.85, radius: 1.2, depth: 100, smooth: 5, mode: 'Circular orbit', dir: 'Clockwise' },
+  'Deep Space':   { speed: 0.04, radius: 2.6, depth: 80, smooth: 65, reverb: 46, room: 82, mode: 'Circular orbit', dir: 'Clockwise' },
+  'Figure Eight': { speed: 0.18, radius: 1.1, depth: 90, smooth: 30, mode: 'Figure eight', dir: 'Clockwise' },
+  'Slowed & Sad': { speed: 0.07, radius: 1.6, depth: 75, smooth: 60, reverb: 34, room: 70, mode: 'Circular orbit', dir: 'Counter-clockwise' },
+  'Old Radio':    { speed: 0.10, radius: 0.6, depth: 55, smooth: 40, mode: 'Static position', dir: 'Clockwise' }
+};
+const TABS = ['Movement', 'Character', 'Space', 'Output'];
+const REFS = ['dot', 'trail1', 'trail2', 'orbit', 'angle', 'dist', 'side', 'l', 'r',
+  'prog', 'progThumb', 'elapsed', 'playIcon', 'status', 'statusDot'];
+
+// Paint palettes — light (paper) and dark (ink). Same values, two inks.
+const PAINT = {
+  A: { dotOn: '#605d5d', dotOff: '#9b9797', meterOn: '#0088b0', meterOff: '#bab6b6',
+       orbitOn: '#38a6cf', orbitOff: '#c3ddea', statusOn: '#006786', statusOff: '#7d7979',
+       lampOn: '#0088b0', lampOff: '#9b9797', icon: '#201e1d' },
+  B: { dotOn: '#e4e2e2', dotOff: '#7d7979', meterOn: '#62c5ee', meterOff: '#605d5d',
+       orbitOn: '#62c5ee', orbitOff: '#33474f', statusOn: '#99e0ff', statusOff: '#9b9797',
+       lampOn: '#62c5ee', lampOff: '#605d5d', icon: '#f3f2f2' }
+};
+// Control-chrome palettes for the styles built in renderVals.
+const UI = {
+  A: { text: '#201e1d', dim: '#7d7979', ink: '#0088b0', inkDim: '#9b9797', deep: '#006786',
+       presetBorder: '#d7d3d3', presetTint: '#e9f8ff', presetText: '#201e1d',
+       tabOff: '#7d7979', engineBg: '#0088b0', engineText: '#f8f4f4',
+       engineOnBg: '#eae9e9', engineOnText: '#006786',
+       boxBg: '#f8f4f4', boxBorder: '#bab6b6', mark: '#f3f2f2' },
+  B: { text: '#f3f2f2', dim: '#9b9797', ink: '#62c5ee', inkDim: '#605d5d', deep: '#99e0ff',
+       presetBorder: '#403d3c', presetTint: '#0a303e', presetText: '#f3f2f2',
+       tabOff: '#9b9797', engineBg: '#62c5ee', engineText: '#0a303e',
+       engineOnBg: '#262423', engineOnText: '#99e0ff',
+       boxBg: '#262423', boxBorder: '#605d5d', mark: '#0a303e' }
+};
+
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.state = {
+      tab: TABS.includes(this.props.defaultTab) ? this.props.defaultTab : 'Movement',
+      vals: Object.assign({}, DEFAULTS),
+      mode: 'Circular orbit', dir: 'Clockwise', character: 'Clean',
+      device: 'Built-in Output', safety: 'Safe (most stable)',
+      preset: 'Classic 8D', playing: true, engine: false,
+      pauseIdle: true, bypass: false, elapsed: 188
+    };
+    this.total = 376;
+    this.angle = 0;
+    ['A', 'B'].forEach(v => REFS.forEach(k => { this[k + 'Ref' + v] = React.createRef(); }));
+  }
+
+  componentDidMount() {
+    this.last = performance.now();
+    this.paintStatic();
+    this.tick = (now) => {
+      const dt = Math.min(0.05, (now - this.last) / 1000);
+      this.last = now;
+      const s = this.state;
+      const moving = s.engine && !s.bypass && (s.playing || !s.pauseIdle);
+      if (s.mode === 'Static position') {
+        this.angle = s.vals.manual;
+      } else if (moving) {
+        const sign = s.dir === 'Clockwise' ? 1 : -1;
+        this.angle = (this.angle + sign * s.vals.speed * 360 * dt) % 360;
+      }
+      if (s.playing) {
+        this.acc = (this.acc || 0) + dt;
+        if (this.acc >= 1) { this.acc = 0; this.bumpTime(); }
+      }
+      this.paintFrame();
+      this.raf = requestAnimationFrame(this.tick);
+    };
+    this.raf = requestAnimationFrame(this.tick);
+  }
+  componentWillUnmount() { cancelAnimationFrame(this.raf); }
+  componentDidUpdate() { this.paintStatic(); }
+
+  bumpTime() {
+    this.setState(s => ({ elapsed: s.elapsed + 1 > this.total ? 0 : s.elapsed + 1 }));
+  }
+  fmtTime(t) {
+    const m = Math.floor(t / 60), sec = Math.floor(t % 60);
+    return m + ':' + String(sec).padStart(2, '0');
+  }
+  ref(name, v) { return this[name + 'Ref' + v].current; }
+
+  paintStatic() {
+    const s = this.state;
+    const frac = s.elapsed / this.total;
+    ['A', 'B'].forEach(v => {
+      const p = PAINT[v];
+      const prog = this.ref('prog', v), thumb = this.ref('progThumb', v);
+      if (prog) prog.style.width = (frac * 100) + '%';
+      if (thumb) thumb.style.left = (frac * 100) + '%';
+      const el = this.ref('elapsed', v);
+      if (el) el.textContent = this.fmtTime(s.elapsed);
+      const st = this.ref('status', v);
+      if (st) {
+        st.textContent = s.bypass ? 'BYPASSED' : s.engine ? 'PROCESSING' : 'READY';
+        st.style.color = s.engine && !s.bypass ? p.statusOn : p.statusOff;
+      }
+      const lamp = this.ref('statusDot', v);
+      if (lamp) lamp.style.background = s.bypass ? p.lampOff : s.engine ? p.lampOn : p.statusOff;
+      const orbit = this.ref('orbit', v);
+      if (orbit) {
+        const px = Math.max(60, Math.min(330, s.vals.radius * 150 + 50));
+        orbit.style.width = px + 'px';
+        orbit.style.height = px + 'px';
+        orbit.style.margin = (-px / 2) + 'px 0 0 ' + (-px / 2) + 'px';
+        orbit.style.borderColor = s.engine && !s.bypass ? p.orbitOn : p.orbitOff;
+      }
+      const icon = this.ref('playIcon', v);
+      if (icon) {
+        icon.innerHTML = s.playing
+          ? '<svg width="16" height="14" viewBox="0 0 16 14"><rect x="2" y="1" width="3.6" height="12" fill="' + p.icon + '"></rect><rect x="10" y="1" width="3.6" height="12" fill="' + p.icon + '"></rect></svg>'
+          : '<svg width="16" height="14" viewBox="0 0 16 14"><path d="M3 1 L3 13 L14 7 Z" fill="' + p.icon + '"></path></svg>';
+      }
+    });
+  }
+
+  paintFrame() {
+    const s = this.state;
+    const R = Math.max(30, Math.min(165, s.vals.radius * 75 + 25));
+    const geom = (a) => {
+      const rad = a * Math.PI / 180;
+      let x = Math.sin(rad) * R, y = -Math.cos(rad) * R;
+      if (s.mode === 'Left–right sweep') y = -R * 0.15;
+      if (s.mode === 'Figure eight') { x = Math.sin(rad) * R; y = -Math.sin(rad * 2) * R * 0.55; }
+      return 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px)';
+    };
+    const norm = ((this.angle % 360) + 540) % 360 - 180;
+    const pan = Math.sin(this.angle * Math.PI / 180) * (s.vals.depth / 100);
+    const active = s.engine && !s.bypass;
+    const trail = this.props.orbitTrail !== false && active;
+    const sign = s.dir === 'Clockwise' ? 1 : -1;
+    const lvl = (s.playing && s.engine ? 1 : 0.55) * (s.vals.volume / 100);
+
+    ['A', 'B'].forEach(v => {
+      const p = PAINT[v];
+      const dot = this.ref('dot', v);
+      if (dot) { dot.style.transform = geom(this.angle); dot.style.background = active ? p.dotOn : p.dotOff; }
+      [['trail1', 14, 0.4], ['trail2', 28, 0.25]].forEach(([name, back, op]) => {
+        const t = this.ref(name, v);
+        if (!t) return;
+        t.style.transform = geom(this.angle - sign * back);
+        t.style.opacity = trail ? op : 0;
+      });
+      const ang = this.ref('angle', v);
+      if (ang) ang.textContent = (norm >= 0 ? '+' : '') + Math.round(norm) + '°';
+      const dist = this.ref('dist', v);
+      if (dist) dist.textContent = s.vals.radius.toFixed(2) + ' m';
+      const side = this.ref('side', v);
+      if (side) side.textContent = pan < -0.15 ? 'left' : pan > 0.15 ? 'right' : 'centre';
+      const l = this.ref('l', v), r = this.ref('r', v);
+      if (l) { l.style.width = Math.max(4, (0.5 - pan * 0.45) * 100 * lvl) + '%'; l.style.background = active ? p.meterOn : p.meterOff; }
+      if (r) { r.style.width = Math.max(4, (0.5 + pan * 0.45) * 100 * lvl) + '%'; r.style.background = active ? p.meterOn : p.meterOff; }
+    });
+  }
+
+  setVal(key, v) { this.setState(s => ({ vals: Object.assign({}, s.vals, { [key]: v }), preset: null })); }
+
+  slider(u, key, label, min, max, step, fmt, hint, dim) {
+    const v = this.state.vals[key];
+    const frac = Math.max(0, Math.min(1, (v - min) / (max - min)));
+    const ink = dim ? u.inkDim : u.ink;
+    const from = (e) => {
+      const r = e.currentTarget.getBoundingClientRect();
+      const f = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+      this.setVal(key, Math.round((min + f * (max - min)) / step) * step);
+    };
+    return {
+      label, hint: hint || '', display: fmt(v),
+      labelStyle: { font: "400 17px/1.2 'Source Serif 4',serif", color: dim ? u.dim : u.text },
+      valueStyle: { font: "600 16px/1.2 'Source Serif 4',serif", color: dim ? u.inkDim : u.ink },
+      fillStyle: { position: 'absolute', left: 0, top: '50%', marginTop: '-1.5px', height: '3px', borderRadius: '2px', background: ink, width: (frac * 100) + '%' },
+      thumbStyle: { position: 'absolute', left: (frac * 100) + '%', top: '50%', width: '20px', height: '20px', transform: 'translate(-50%,-50%)', borderRadius: '50%', background: ink },
+      onDown: (e) => { e.currentTarget.setPointerCapture(e.pointerId); from(e); },
+      onMove: (e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) from(e); }
+    };
+  }
+
+  controls(u) {
+    const s = this.state, v = s.vals;
+    const pct = (x) => Math.round(x) + '%';
+    const sl = (...a) => this.slider(u, ...a);
+    let sliders = [], toggles = [];
+    if (s.tab === 'Movement') {
+      sliders = [
+        sl('speed', 'Movement speed', 0.01, 1, 0.01, x => x.toFixed(2) + ' rot/s · ' + (1 / x).toFixed(1) + ' s', 'How fast the source travels around you'),
+        sl('radius', 'Orbit radius', 0.2, 3, 0.05, x => x.toFixed(2) + ' m', 'Virtual distance to the source — affects level, tone and room'),
+        sl('depth', 'Effect depth', 0, 100, 1, pct),
+        sl('smooth', 'Smoothness', 0, 100, 1, pct),
+        sl('manual', 'Manual position', -180, 180, 1, x => (x >= 0 ? '+' : '') + Math.round(x) + '°', 'Used by the Static position mode', s.mode !== 'Static position')
+      ];
+      toggles = [{ key: 'pauseIdle', label: 'Pause the orbit when nothing plays', checked: s.pauseIdle }];
+    } else if (s.tab === 'Character') {
+      sliders = [sl('charAmt', 'Character amount', 0, 100, 1, pct,
+        s.character === 'Clean' ? 'The source passes through untouched' : 'How much of the ' + s.character.toLowerCase() + ' colour is printed on the source',
+        s.character === 'Clean')];
+    } else if (s.tab === 'Space') {
+      sliders = [
+        sl('width', 'Stereo width', 0, 200, 1, pct),
+        sl('delay', 'Delay', 0, 100, 1, pct),
+        sl('delayTime', 'Delay time', 20, 900, 5, x => Math.round(x) + ' ms', '', v.delay === 0),
+        sl('feedback', 'Delay feedback', 0, 95, 1, pct, '', v.delay === 0),
+        sl('reverb', 'Reverb', 0, 100, 1, pct),
+        sl('room', 'Room size', 0, 100, 1, pct, '', v.reverb === 0),
+        sl('damping', 'Damping', 0, 100, 1, pct, '', v.reverb === 0)
+      ];
+    } else {
+      sliders = [sl('volume', 'Output volume', 0, 100, 1, pct)];
+      toggles = [{ key: 'bypass', label: 'Bypass all processing', checked: s.bypass }];
+    }
+    toggles = toggles.map(t => ({
+      label: t.label, checked: t.checked, mark: t.checked ? '✓' : '',
+      boxStyle: {
+        width: '22px', height: '22px', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        border: '1px solid ' + (t.checked ? u.ink : u.boxBorder), borderRadius: '2px',
+        background: t.checked ? u.ink : u.boxBg, color: u.mark,
+        font: "400 13px/1 'Source Serif 4',serif"
+      },
+      onChange: () => this.setState({ [t.key]: !t.checked })
+    }));
+    const presets = Object.keys(PRESETS).map(name => ({
+      name,
+      style: {
+        flex: 'none', minHeight: '44px', padding: '0 16px', cursor: 'pointer', whiteSpace: 'nowrap',
+        font: "400 16px/1 'Source Serif 4',serif", borderRadius: '2px',
+        border: '1px solid ' + (s.preset === name ? u.ink : u.presetBorder),
+        background: s.preset === name ? u.presetTint : 'transparent',
+        color: s.preset === name ? u.deep : u.presetText
+      },
+      onClick: () => this.setState(st => ({ preset: name, vals: Object.assign({}, st.vals, PRESETS[name]), mode: PRESETS[name].mode, dir: PRESETS[name].dir }))
+    }));
+    const tabs = TABS.map(name => ({
+      name,
+      style: {
+        flex: 1, minHeight: '44px', cursor: 'pointer', background: 'transparent', border: 'none',
+        padding: '0 0 10px', letterSpacing: '0.1em', textTransform: 'uppercase',
+        font: (s.tab === name ? '600' : '400') + " 11px/1 'Source Serif 4',serif",
+        color: s.tab === name ? u.ink : u.tabOff,
+        borderBottom: '2px solid ' + (s.tab === name ? u.ink : 'transparent'),
+        marginBottom: '-1px'
+      },
+      onClick: () => this.setState({ tab: name })
+    }));
+    const engineStyle = {
+      flex: 1, height: '48px', cursor: 'pointer', borderRadius: '2px',
+      font: "600 17px/1 'Source Serif 4',serif",
+      background: s.engine ? u.engineOnBg : u.engineBg,
+      color: s.engine ? u.engineOnText : u.engineText,
+      border: '1px solid ' + u.ink
+    };
+    return { sliders, toggles, presets, tabs, engineStyle };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const set = (k) => (e) => this.setState({ [k]: e.target.value, preset: null });
+    let selects = [];
+    if (s.tab === 'Movement') {
+      selects = [
+        { label: 'Movement path', value: s.mode, options: ['Circular orbit', 'Left–right sweep', 'Figure eight', 'Static position'], onChange: set('mode') },
+        { label: 'Direction', value: s.dir, options: ['Clockwise', 'Counter-clockwise'], onChange: set('dir') }
+      ];
+    } else if (s.tab === 'Character') {
+      selects = [{ label: 'Character', value: s.character, options: ['Clean', 'Warm tape', 'Vinyl', 'Radio', 'Cassette', 'Cathedral'], onChange: set('character') }];
+    } else if (s.tab === 'Output') {
+      selects = [
+        { label: 'Output device', value: s.device, options: ['Built-in Output', 'AirPods Pro', 'Bluetooth Speaker', 'Wired Headphones'], onChange: set('device') },
+        { label: 'Processing mode', value: s.safety, options: ['Safe (most stable)', 'Balanced', 'Maximum quality'], onChange: set('safety') }
+      ];
+    }
+    const a = this.controls(UI.A), b = this.controls(UI.B);
+    const out = {
+      selects,
+      presetsOn: this.props.showPresets !== false,
+      slidersA: a.sliders, togglesA: a.toggles, presetsA: a.presets, tabsA: a.tabs, engineStyleA: a.engineStyle,
+      slidersB: b.sliders, togglesB: b.toggles, presetsB: b.presets, tabsB: b.tabs, engineStyleB: b.engineStyle,
+      engineLabel: s.engine ? 'Stop' : 'Start',
+      onEngine: () => this.setState(st => ({ engine: !st.engine })),
+      onPlayPause: () => this.setState(st => ({ playing: !st.playing })),
+      onPrev: () => this.setState({ elapsed: 0 }),
+      onNext: () => this.setState({ elapsed: 0, playing: true }),
+      onSeek: (e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        const f = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+        this.setState({ elapsed: Math.round(f * this.total) });
+      },
+      onReset: () => this.setState({ vals: Object.assign({}, DEFAULTS), mode: 'Circular orbit', dir: 'Clockwise', character: 'Clean', preset: 'Classic 8D', bypass: false, pauseIdle: true })
+    };
+    ['A', 'B'].forEach(v => REFS.forEach(k => { out[k + 'Ref' + v] = this[k + 'Ref' + v]; }));
+    return out;
+  }
+}
+</script>
+</body>
+</html>

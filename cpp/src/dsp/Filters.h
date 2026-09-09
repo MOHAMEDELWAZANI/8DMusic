@@ -127,4 +127,98 @@ private:
     size_t i_ = 0;
 };
 
+
+// Three-band tone control: bass shelf, mid peak, treble shelf.
+//
+// Flat is the default and is a true no-op -- with all three gains at 0 dB the
+// samples pass through untouched, so a build that never shows the equaliser
+// still produces bit-identical output to one that does.
+class ToneStack {
+public:
+    void init(float rate) {
+        rate_ = rate;
+        set(0.f, 0.f, 0.f);
+        reset();
+    }
+    void reset() { for (auto& b : band_) b.reset(); }
+
+    // Gains in dB, each roughly -12 .. +12.
+    void set(float bassDb, float midDb, float trebleDb) {
+        if (bassDb == bass_ && midDb == mid_ && treble_ == trebleDb) return;
+        bass_ = bassDb; mid_ = midDb; treble_ = trebleDb;
+        flat_ = (bassDb == 0.f && midDb == 0.f && trebleDb == 0.f);
+        band_[0].lowShelf(120.f, bassDb, rate_);
+        band_[1].peak(1000.f, 0.9f, midDb, rate_);
+        band_[2].highShelf(4500.f, trebleDb, rate_);
+    }
+
+    void process(float* io, uint32_t n) {
+        if (flat_) return;
+        for (auto& b : band_) b.process(io, n);
+    }
+
+private:
+    // Stereo biquad, direct form I, coefficients from the RBJ cookbook.
+    struct Biquad {
+        void reset() { std::memset(x1, 0, sizeof x1); std::memset(x2, 0, sizeof x2);
+                       std::memset(y1, 0, sizeof y1); std::memset(y2, 0, sizeof y2); }
+
+        void lowShelf(float f, float dB, float rate) {
+            const double A = std::pow(10.0, dB / 40.0);
+            const double w = 6.283185307179586 * f / rate;
+            const double cw = std::cos(w), sw = std::sin(w);
+            const double alpha = sw / 2.0 * std::sqrt((A + 1 / A) * (1 / 0.9 - 1) + 2);
+            const double t = 2 * std::sqrt(A) * alpha;
+            set((A + 1) - (A - 1) * cw + t, 2 * ((A - 1) - (A + 1) * cw),
+                (A + 1) - (A - 1) * cw - t,
+                A * ((A + 1) + (A - 1) * cw + t), -2 * A * ((A - 1) + (A + 1) * cw),
+                A * ((A + 1) + (A - 1) * cw - t));
+        }
+        void highShelf(float f, float dB, float rate) {
+            const double A = std::pow(10.0, dB / 40.0);
+            const double w = 6.283185307179586 * f / rate;
+            const double cw = std::cos(w), sw = std::sin(w);
+            const double alpha = sw / 2.0 * std::sqrt((A + 1 / A) * (1 / 0.9 - 1) + 2);
+            const double t = 2 * std::sqrt(A) * alpha;
+            set((A + 1) + (A - 1) * cw + t, -2 * ((A - 1) + (A + 1) * cw),
+                (A + 1) + (A - 1) * cw - t,
+                A * ((A + 1) - (A - 1) * cw + t), 2 * A * ((A - 1) - (A + 1) * cw),
+                A * ((A + 1) - (A - 1) * cw - t));
+        }
+        void peak(float f, float q, float dB, float rate) {
+            const double A = std::pow(10.0, dB / 40.0);
+            const double w = 6.283185307179586 * f / rate;
+            const double alpha = std::sin(w) / (2 * q);
+            set(1 + alpha / A, -2 * std::cos(w), 1 - alpha / A,
+                1 + alpha * A, -2 * std::cos(w), 1 - alpha * A);
+        }
+
+        void process(float* io, uint32_t n) {
+            for (int c = 0; c < 2; ++c) {
+                float X1 = x1[c], X2 = x2[c], Y1 = y1[c], Y2 = y2[c];
+                for (uint32_t i = 0; i < n; ++i) {
+                    const float x = io[2 * i + c];
+                    const float y = b0 * x + b1 * X1 + b2 * X2 - a1 * Y1 - a2 * Y2;
+                    X2 = X1; X1 = x; Y2 = Y1; Y1 = y;
+                    io[2 * i + c] = y;
+                }
+                x1[c] = X1; x2[c] = X2; y1[c] = Y1; y2[c] = Y2;
+            }
+        }
+
+        void set(double a0, double A1, double A2, double B0, double B1, double B2) {
+            b0 = float(B0 / a0); b1 = float(B1 / a0); b2 = float(B2 / a0);
+            a1 = float(A1 / a0); a2 = float(A2 / a0);
+        }
+
+        float b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0;
+        float x1[2]{}, x2[2]{}, y1[2]{}, y2[2]{};
+    };
+
+    float rate_ = 48000.f;
+    float bass_ = 1e9f, mid_ = 1e9f, treble_ = 1e9f;
+    bool  flat_ = true;
+    Biquad band_[3];
+};
+
 } // namespace eightd

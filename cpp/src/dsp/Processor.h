@@ -49,6 +49,7 @@ private:
     DelayLine itd_, echoLine_;
     Reverb reverb_;
     OnePole shadowLp_, rearLp_, airLp_;
+    ToneStack tone_;
     PitchDown pitch_;
     RadioTone radio_;
 

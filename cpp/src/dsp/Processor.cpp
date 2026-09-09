@@ -15,6 +15,7 @@ void Processor::init(float rate, uint32_t maxBlock) {
     pitch_.init(rate, maxBlock);
     radio_.init(rate, maxBlock);
     radio_.prepare(maxBlock);
+    tone_.init(rate);
 
     wet_.assign(maxBlock * 2, 0.f);
     scratch_.assign(maxBlock * 2, 0.f);
@@ -28,7 +29,7 @@ void Processor::init(float rate, uint32_t maxBlock) {
 void Processor::reset() {
     orbit_.reset(); itd_.reset(); echoLine_.reset(); reverb_.reset();
     shadowLp_.reset(); rearLp_.reset(); airLp_.reset();
-    pitch_.reset(); radio_.reset();
+    pitch_.reset(); radio_.reset(); tone_.reset();
     limiterGain_ = 1.f; echoTime_ = 0.28f; lastAirCut_ = -1.f;
     quietFor_ = 0.f; playing_ = false; motionLevel_ = 0.f;
 }
@@ -190,6 +191,12 @@ void Processor::process(const float* in, float* out, uint32_t n, const Params& p
         const float dry = 1.f - 0.5f * wetAmount, w = wetAmount * 3.f;
         for (uint32_t i = 0; i < n * 2; ++i) wet[i] = wet[i] * dry + tail_[i] * w;
     }
+
+    // --- tone ---------------------------------------------------------------------
+    // Last before the output stage, so the equaliser shapes the finished image
+    // rather than the source that feeds the orbit.
+    tone_.set(p.eqBass, p.eqMid, p.eqTreble);
+    tone_.process(wet, n);
 
     // --- output stage ------------------------------------------------------------
     for (uint32_t i = 0; i < n * 2; ++i) wet[i] *= p.outputGain;

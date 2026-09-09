@@ -75,6 +75,11 @@ struct Params {
     float reverbDamp       = 0.45f;
 
     float outputGain       = 0.9f;
+
+    // Three-band tone control, in dB.  All three at 0 is a true bypass.
+    float eqBass           = 0.0f;
+    float eqMid            = 0.0f;
+    float eqTreble         = 0.0f;
 };
 
 struct Preset { const char* name; Params p; };

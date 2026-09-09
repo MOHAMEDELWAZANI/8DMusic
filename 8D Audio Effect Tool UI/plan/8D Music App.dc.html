@@ -1,0 +1,1424 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+  body { margin:0; background:#e4e2e2; font-family:"Source Serif 4",Georgia,serif; }
+  a { color:#0088b0; text-decoration:none; }
+  a:hover { color:#006786; }
+  select { -webkit-appearance:none; appearance:none; }
+</style>
+</helmet>
+
+<section style="padding:64px 40px 30px;font-family:'Source Serif 4',Georgia,serif;color:#201e1d;max-width:1180px">
+  <div style="display:flex;align-items:center;gap:14px">
+    <svg width="42" height="42" viewBox="0 0 512 512" role="img" aria-label="8D Music">
+      <rect x="148" y="200" width="44" height="92" rx="22" fill="#201e1d"></rect>
+      <rect x="211" y="143" width="44" height="149" rx="22" fill="#201e1d"></rect>
+      <rect x="274" y="175" width="44" height="117" rx="22" fill="#201e1d"></rect>
+      <rect x="339" y="228" width="44" height="64" rx="22" fill="#201e1d"></rect>
+      <path d="M100 316 C 170 382, 342 382, 408 320" fill="none" stroke="#0088b0" stroke-width="30" stroke-linecap="round"></path>
+      <circle cx="410" cy="320" r="30" fill="#d6006c"></circle>
+    </svg>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#605d5d">8D MUSIC · ANDROID · DESIGN DOCUMENT</span>
+      <span style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">17 screens · dark ink theme · Source Serif 4</span>
+    </div>
+  </div>
+
+  <h1 style="margin:26px 0 0;font:600 60px/0.98 'Source Serif 4',serif;letter-spacing:-0.015em;max-width:24ch;text-wrap:pretty">Real-time 8D sound for everything the phone plays</h1>
+  <p style="margin:20px 0 0;font:400 20px/1.5 'Source Serif 4',serif;color:#3f3c3c;max-width:66ch;text-wrap:pretty">8D Music takes audio that is already playing and moves it on a path around the listener's head, live, on the device — no uploads, no re-encoded files, no waiting. The design problem is not the effect; it is that Android gives three different ways to reach the audio, each with a different cost. The whole interface is built to make that choice honest and reversible.</p>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:34px;margin-top:46px;padding-top:34px;border-top:1px solid #cfcbcb">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#0088b0">1 · DIRECT CAPTURE</span>
+      <p style="margin:0;font:400 17px/1.45 'Source Serif 4',serif;color:#3f3c3c;text-wrap:pretty">Spatialises whatever app is playing through Android's playback capture. Nothing to set up — but apps are allowed to refuse it, and some do. The design treats that refusal as a first-class state (screen <a href="#2i">2i</a>), not an error.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#0088b0">2 · LOCAL PLAYER</span>
+      <p style="margin:0;font:400 17px/1.45 'Source Serif 4',serif;color:#3f3c3c;text-wrap:pretty">The route that always works, online or not. Files from the device, playlists the user builds, and each playlist able to carry its own preset so the effect changes with the listening. This is the home of the app, not a fallback.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#0088b0">3 · SYSTEM-WIDE (SHIZUKU)</span>
+      <p style="margin:0;font:400 17px/1.45 'Source Serif 4',serif;color:#3f3c3c;text-wrap:pretty">Shell-level access granted through Shizuku, no root. Every app, including the ones that block capture. It costs one careful pairing, so the setup is a live checklist that reacts to the phone's real state rather than a slideshow.</p>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:40px;padding:22px 24px;border:1px solid #cfcbcb;background:#eeecec">
+    <span style="font:400 16px/1.3 'Source Serif 4',serif;color:#3f3c3c">Direct capture</span>
+    <span style="font:400 16px/1 'Source Serif 4',serif;color:#9b9797">·</span>
+    <span style="font:400 16px/1.3 'Source Serif 4',serif;color:#3f3c3c">Local player</span>
+    <span style="font:400 16px/1 'Source Serif 4',serif;color:#9b9797">·</span>
+    <span style="font:400 16px/1.3 'Source Serif 4',serif;color:#3f3c3c">Shizuku</span>
+    <span style="font:400 18px/1 'Source Serif 4',serif;color:#0088b0">→</span>
+    <span style="font:600 16px/1.3 'Source Serif 4',serif;color:#201e1d">8D DSP engine (C++ / NDK)</span>
+    <span style="font:400 15px/1.3 'Source Serif 4',serif;color:#605d5d">modes · spatial audio · effects · controls · presets</span>
+    <span style="font:400 18px/1 'Source Serif 4',serif;color:#0088b0">→</span>
+    <span style="font:600 16px/1.3 'Source Serif 4',serif;color:#201e1d">Headphones</span>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:40px;margin-top:46px;padding-top:34px;border-top:1px solid #cfcbcb">
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#0088b0">TURN 2 — GETTING IN, AND BEING TAUGHT</span>
+      <p style="margin:0;font:400 16px/1.45 'Source Serif 4',serif;color:#605d5d;text-wrap:pretty">Each guide is full-screen, appears once on first entry, and never returns after the thing is actually done — a created playlist, a connected Shizuku. All of them stay replayable from About.</p>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;gap:12px;align-items:baseline"><a href="#2a" style="font:600 14px/1.3 'Source Serif 4',serif;flex:none;width:26px">2a</a><span style="font:400 16px/1.35 'Source Serif 4',serif;color:#3f3c3c">Sign in — Google, or continue without an account at equal weight</span></div>
+        <div style="display:flex;gap:12px;align-items:baseline"><a href="#2b" style="font:600 14px/1.3 'Source Serif 4',serif;flex:none;width:26px">2b</a><span style="font:400 16px/1.35 'Source Serif 4',serif;color:#3f3c3c">Intro 1 — what 8D actually is</span></div>
+        <div style="display:flex;gap:12px;align-items:baseline"><a href="#2c" style="font:600 14px/1.3 'Source Serif 4',serif;flex:none;width:26px">2c</a><span style="font:400 16px/1.35 'Source Serif 4',serif;color:#3f3c3c">Intro 2 — the three routes and their real costs</span></div>
+        <div style="display:flex;gap:12px;align-items:baseline"><a href="#2d" style="font:600 14px/1.3 'Source Serif 4',serif;flex:none;width:26px">2d</a><span style="font:400 16px/1.35 'Source Serif 4',serif;color:#3f3c3c">Intro 3 — nothing is permanent, and what the guides cover</span></div>
+        <div style="display:flex;gap:12px;align-items:baseline"><a href="#2e" style="font:600 14px/1.3 'Source Serif 4',serif;flex:none;width:26px">2e</a><span style="font:400 16px/1.35 'Source Serif 4',serif;color:#3f3c3c">Guide · 8D effects — one page per mode, each with a demo you hear</span></div>
+        <div style="display:flex;gap:12px;align-items:baseline"><a href="#2f" style="font:600 14px/1.3 'Source Serif 4',serif;flex:none;width:26px">2f</a><span style="font:400 16px/1.35 'Source Serif 4',serif;color:#3f3c3c">Guide · local player — how playlists and their presets work</span></div>
+        <div style="display:flex;gap:12px;align-items:baseline"><a href="#2g" style="font:600 14px/1.3 'Source Serif 4',serif;flex:none;width:26px">2g</a><span style="font:400 16px/1.35 'Source Serif 4',serif;color:#3f3c3c">Guide · Shizuku — why it is needed before how to do it</span></div>
+        <div style="display:flex;gap:12px;align-items:baseline"><a href="#2h" style="font:600 14px/1.3 'Source Serif 4',serif;flex:none;width:26px">2h</a><span style="font:400 16px/1.35 'Source Serif 4',serif;color:#3f3c3c">About — why the app exists, plus every guide replayable with its state</span></div>
+        <div style="display:flex;gap:12px;align-items:baseline"><a href="#2i" style="font:600 14px/1.3 'Source Serif 4',serif;flex:none;width:26px">2i</a><span style="font:400 16px/1.35 'Source Serif 4',serif;color:#3f3c3c">Capture refused — the recovery that decides whether the first run survives</span></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#0088b0">TURN 1 — THE APP ITSELF</span>
+      <p style="margin:0;font:400 16px/1.45 'Source Serif 4',serif;color:#605d5d;text-wrap:pretty">One bottom bar throughout — Player, Modes, Presets, Library, Settings — with the current source and engine state always legible in the top strip.</p>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;gap:12px;align-items:baseline"><a href="#1a" style="font:600 14px/1.3 'Source Serif 4',serif;flex:none;width:26px">1a</a><span style="font:400 16px/1.35 'Source Serif 4',serif;color:#3f3c3c">Source picker — the three routes, setup cost stated up front</span></div>
+        <div style="display:flex;gap:12px;align-items:baseline"><a href="#1b" style="font:600 14px/1.3 'Source Serif 4',serif;flex:none;width:26px">1b</a><span style="font:400 16px/1.35 'Source Serif 4',serif;color:#3f3c3c">Player — live orbit, transport, and the two controls people touch most</span></div>
+        <div style="display:flex;gap:12px;align-items:baseline"><a href="#1c" style="font:600 14px/1.3 'Source Serif 4',serif;flex:none;width:26px">1c</a><span style="font:400 16px/1.35 'Source Serif 4',serif;color:#3f3c3c">Modes — orbit, pendulum, spiral, figure eight, plus speed and distance</span></div>
+        <div style="display:flex;gap:12px;align-items:baseline"><a href="#1d" style="font:600 14px/1.3 'Source Serif 4',serif;flex:none;width:26px">1d</a><span style="font:400 16px/1.35 'Source Serif 4',serif;color:#3f3c3c">Effects &amp; space — character, reverb, delay, width, three-band EQ</span></div>
+        <div style="display:flex;gap:12px;align-items:baseline"><a href="#1e" style="font:600 14px/1.3 'Source Serif 4',serif;flex:none;width:26px">1e</a><span style="font:400 16px/1.35 'Source Serif 4',serif;color:#3f3c3c">Presets — the user's own above the built-ins, saved and loaded</span></div>
+        <div style="display:flex;gap:12px;align-items:baseline"><a href="#1f" style="font:600 14px/1.3 'Source Serif 4',serif;flex:none;width:26px">1f</a><span style="font:400 16px/1.35 'Source Serif 4',serif;color:#3f3c3c">Library — tracks, playlists, folders, with a mini-player docked</span></div>
+        <div style="display:flex;gap:12px;align-items:baseline"><a href="#1g" style="font:600 14px/1.3 'Source Serif 4',serif;flex:none;width:26px">1g</a><span style="font:400 16px/1.35 'Source Serif 4',serif;color:#3f3c3c">Shizuku setup — four steps that tick themselves off, with an exit</span></div>
+        <div style="display:flex;gap:12px;align-items:baseline"><a href="#1h" style="font:600 14px/1.3 'Source Serif 4',serif;flex:none;width:26px">1h</a><span style="font:400 16px/1.35 'Source Serif 4',serif;color:#3f3c3c">Settings — source, output, processing quality, engine behaviour</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:52px 40px 90px;font-family:'Source Serif 4',Georgia,serif;color:#201e1d">
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:70ch">
+    <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#0088b0">TURN 2 · ACCOUNT, INTRO &amp; GUIDES</span>
+    <h1 style="margin:0;font:600 46px/1 'Source Serif 4',serif;letter-spacing:-0.01em">Onboarding and teaching</h1>
+    <p style="margin:0;font:400 18px/1.45 'Source Serif 4',serif;color:#605d5d;text-wrap:pretty">Account first (skippable, equal weight), then a three-page intro, then full-screen guides that fire once — on first entry to each place, and never again once the thing is actually done. Every guide stays replayable from About.</p>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:44px;margin-top:46px">
+
+    <div id="2a" style="display:flex;flex-direction:column;gap:14px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font:600 12px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#f8f4f4;background:#201e1d;padding:6px 9px">2a</span>
+        <span style="font:600 17px/1 'Source Serif 4',serif">Sign in</span>
+        <span style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">optional</span>
+      </div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 412 }}" height="{{ 892 }}" style="flex:none" hint-size="412px,892px">
+        <div data-screen-label="2a Sign in" style="min-height:100%;background:#1a1918;color:#f3f2f2;padding:26px 18px 30px;display:flex;flex-direction:column">
+          <svg width="34" height="34" viewBox="0 0 512 512" role="img" aria-label="8D Music">
+            <rect x="148" y="200" width="44" height="92" rx="22" fill="#f3f2f2"></rect>
+            <rect x="211" y="143" width="44" height="149" rx="22" fill="#f3f2f2"></rect>
+            <rect x="274" y="175" width="44" height="117" rx="22" fill="#f3f2f2"></rect>
+            <rect x="339" y="228" width="44" height="64" rx="22" fill="#f3f2f2"></rect>
+            <path d="M104 320 C 170 382, 342 382, 412 316" fill="none" stroke="#62c5ee" stroke-width="30" stroke-linecap="round"></path>
+            <circle cx="102" cy="318" r="30" fill="#ff458e"></circle>
+          </svg>
+
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:34px">
+            <h2 style="margin:0;font:600 34px/1.03 'Source Serif 4',serif">Keep your playlists and presets</h2>
+            <p style="margin:0;font:400 16px/1.4 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">An account backs up your playlists, presets and settings, and restores them on a new phone. Everything works without one — sign in whenever you like and what you already made comes with you.</p>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:34px">
+            <button style="height:56px;width:100%;display:flex;align-items:center;justify-content:center;gap:12px;font:600 17px/1 'Source Serif 4',serif;background:#f3f2f2;color:#201e1d;border:1px solid #f3f2f2;cursor:pointer" style-active="opacity:0.85">
+              <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M19.6 10.2c0-.7-.06-1.4-.18-2H10v3.8h5.4a4.7 4.7 0 0 1-2 3.1v2.6h3.2c1.9-1.7 3-4.3 3-7.5z" fill="#4285f4"></path>
+                <path d="M10 20c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1a6 6 0 0 1-5.6-4.1H1.1v2.6A10 10 0 0 0 10 20z" fill="#34a853"></path>
+                <path d="M4.4 12a6 6 0 0 1 0-3.9V5.5H1.1a10 10 0 0 0 0 9z" fill="#fbbc05"></path>
+                <path d="M10 4a5.4 5.4 0 0 1 3.8 1.5l2.8-2.8A9.6 9.6 0 0 0 10 0 10 10 0 0 0 1.1 5.5l3.3 2.6A6 6 0 0 1 10 4z" fill="#ea4335"></path>
+              </svg>
+              Continue with Google
+            </button>
+            <button style="height:56px;width:100%;font:600 17px/1 'Source Serif 4',serif;background:transparent;color:#f3f2f2;border:1px solid #605d5d;cursor:pointer" style-hover="background:#262423">Continue without an account</button>
+          </div>
+
+          <div style="margin-top:auto;display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;gap:12px;align-items:flex-start">
+              <span style="width:6px;height:6px;border-radius:50%;background:#62c5ee;margin-top:8px;flex:none"></span>
+              <span style="font:400 14px/1.4 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">Your audio never leaves the phone. Only playlist names, presets and settings are backed up.</span>
+            </div>
+            <span style="font:400 13px/1.4 'Source Serif 4',serif;color:#7d7979">By continuing you agree to the terms and privacy notice.</span>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div id="2b" style="display:flex;flex-direction:column;gap:14px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font:600 12px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#f8f4f4;background:#201e1d;padding:6px 9px">2b</span>
+        <span style="font:600 17px/1 'Source Serif 4',serif">Intro 1 / 3</span>
+        <span style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">what 8D is</span>
+      </div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 412 }}" height="{{ 892 }}" style="flex:none" hint-size="412px,892px">
+        <div data-screen-label="2b Intro 1" style="min-height:100%;background:#1a1918;color:#f3f2f2;display:flex;flex-direction:column;padding:20px 18px 26px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#62c5ee">1 OF 3</span>
+            <button style="min-height:44px;padding:0 4px;font:400 15px/1 'Source Serif 4',serif;color:#bab6b6;background:transparent;border:none;cursor:pointer" style-hover="color:#f3f2f2">Skip</button>
+          </div>
+
+          <div style="position:relative;width:300px;height:300px;margin:36px auto 0">
+            <div style="position:absolute;inset:0;border:1px solid #403d3c;border-radius:50%"></div>
+            <div style="position:absolute;left:50%;top:50%;width:170px;height:170px;margin:-85px 0 0 -85px;border:1px dashed #62c5ee;border-radius:50%"></div>
+            <div style="position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border:1px solid #605d5d;border-radius:50%"></div>
+            <div style="position:absolute;left:50%;top:50%;width:0;height:0;margin:-7px 0 0 -5px;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:9px solid #9b9797"></div>
+            <div style="position:absolute;left:50%;top:50%;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;background:#e4e2e2;transform:translate(120px,-25px)"></div>
+            <div style="position:absolute;left:50%;top:50%;width:13px;height:13px;margin:-6.5px 0 0 -6.5px;border-radius:50%;background:#7d7979;opacity:0.45;transform:translate(104px,-58px)"></div>
+            <div style="position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:#605d5d;opacity:0.3;transform:translate(82px,-82px)"></div>
+            <span style="position:absolute;left:50%;bottom:-2px;transform:translateX(-50%);font:400 10px/1 'Source Serif 4',serif;letter-spacing:0.2em;color:#7d7979;background:#1a1918;padding:0 6px">YOU</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:40px">
+            <h2 style="margin:0;font:600 34px/1.03 'Source Serif 4',serif">The sound moves around you</h2>
+            <p style="margin:0;font:400 17px/1.45 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">8D Music places whatever you're listening to on a path around your head and keeps it moving in real time. Headphones required — that's how the effect works at all.</p>
+          </div>
+
+          <div style="margin-top:auto;display:flex;align-items:center;gap:16px">
+            <div style="display:flex;gap:7px;flex:1">
+              <span style="width:26px;height:3px;background:#62c5ee"></span>
+              <span style="width:26px;height:3px;background:#403d3c"></span>
+              <span style="width:26px;height:3px;background:#403d3c"></span>
+            </div>
+            <button aria-label="Previous" disabled="{{ true }}" style="flex:none;width:56px;height:52px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid #332f2f;cursor:not-allowed">
+              <svg width="16" height="14" viewBox="0 0 16 14" aria-hidden="true"><path d="M11 1 L4 7 L11 13" fill="none" stroke="#605d5d" stroke-width="1.6"></path></svg>
+            </button>
+            <button aria-label="Next" style="flex:none;width:96px;height:52px;display:flex;align-items:center;justify-content:center;background:#62c5ee;border:1px solid #62c5ee;cursor:pointer" style-active="opacity:0.85">
+              <svg width="16" height="14" viewBox="0 0 16 14" aria-hidden="true"><path d="M5 1 L12 7 L5 13" fill="none" stroke="#0a303e" stroke-width="1.8"></path></svg>
+            </button>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div id="2c" style="display:flex;flex-direction:column;gap:14px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font:600 12px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#f8f4f4;background:#201e1d;padding:6px 9px">2c</span>
+        <span style="font:600 17px/1 'Source Serif 4',serif">Intro 2 / 3</span>
+        <span style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">three routes, honestly</span>
+      </div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 412 }}" height="{{ 892 }}" style="flex:none" hint-size="412px,892px">
+        <div data-screen-label="2c Intro 2" style="min-height:100%;background:#1a1918;color:#f3f2f2;display:flex;flex-direction:column;padding:20px 18px 26px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#62c5ee">2 OF 3</span>
+            <button style="min-height:44px;padding:0 4px;font:400 15px/1 'Source Serif 4',serif;color:#bab6b6;background:transparent;border:none;cursor:pointer" style-hover="color:#f3f2f2">Skip</button>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:28px">
+            <h2 style="margin:0;font:600 34px/1.03 'Source Serif 4',serif">Three ways in</h2>
+            <p style="margin:0;font:400 17px/1.45 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">Each one has a different cost. Two need nothing from you at all.</p>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:14px;margin-top:30px">
+            <div style="display:flex;gap:14px">
+              <span style="flex:none;width:34px;font:600 26px/1 'Source Serif 4',serif;color:#403d3c">1</span>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span style="font:600 20px/1.1 'Source Serif 4',serif">Direct capture</span>
+                <span style="font:400 15px/1.4 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">Spatialises the app you're already using. Nothing to set up — but some apps block capture, and then it won't work.</span>
+              </div>
+            </div>
+            <div style="height:1px;background:#262423"></div>
+            <div style="display:flex;gap:14px">
+              <span style="flex:none;width:34px;font:600 26px/1 'Source Serif 4',serif;color:#403d3c">2</span>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span style="font:600 20px/1.1 'Source Serif 4',serif">Local player</span>
+                <span style="font:400 15px/1.4 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">Always works, online or not. Build playlists from files on the phone and play them through your own effects.</span>
+              </div>
+            </div>
+            <div style="height:1px;background:#262423"></div>
+            <div style="display:flex;gap:14px">
+              <span style="flex:none;width:34px;font:600 26px/1 'Source Serif 4',serif;color:#403d3c">3</span>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span style="font:600 20px/1.1 'Source Serif 4',serif">System-wide (Shizuku)</span>
+                <span style="font:400 15px/1.4 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">Every app, no exceptions — including the ones that block capture. Costs one careful setup, and we walk you through it.</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:auto;display:flex;align-items:center;gap:16px">
+            <div style="display:flex;gap:7px;flex:1">
+              <span style="width:26px;height:3px;background:#403d3c"></span>
+              <span style="width:26px;height:3px;background:#62c5ee"></span>
+              <span style="width:26px;height:3px;background:#403d3c"></span>
+            </div>
+            <button aria-label="Previous" style="flex:none;width:56px;height:52px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid #605d5d;cursor:pointer" style-hover="background:#262423">
+              <svg width="16" height="14" viewBox="0 0 16 14" aria-hidden="true"><path d="M11 1 L4 7 L11 13" fill="none" stroke="#f3f2f2" stroke-width="1.6"></path></svg>
+            </button>
+            <button aria-label="Next" style="flex:none;width:96px;height:52px;display:flex;align-items:center;justify-content:center;background:#62c5ee;border:1px solid #62c5ee;cursor:pointer" style-active="opacity:0.85">
+              <svg width="16" height="14" viewBox="0 0 16 14" aria-hidden="true"><path d="M5 1 L12 7 L5 13" fill="none" stroke="#0a303e" stroke-width="1.8"></path></svg>
+            </button>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div id="2d" style="display:flex;flex-direction:column;gap:14px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font:600 12px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#f8f4f4;background:#201e1d;padding:6px 9px">2d</span>
+        <span style="font:600 17px/1 'Source Serif 4',serif">Intro 3 / 3</span>
+        <span style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">pick one, start</span>
+      </div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 412 }}" height="{{ 892 }}" style="flex:none" hint-size="412px,892px">
+        <div data-screen-label="2d Intro 3" style="min-height:100%;background:#1a1918;color:#f3f2f2;display:flex;flex-direction:column;padding:20px 18px 26px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#62c5ee">3 OF 3</span>
+            <span style="min-height:44px;display:flex;align-items:center;font:400 15px/1 'Source Serif 4',serif;color:#7d7979">Last one</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:28px">
+            <h2 style="margin:0;font:600 34px/1.03 'Source Serif 4',serif">Nothing here is permanent</h2>
+            <p style="margin:0;font:400 17px/1.45 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">Choose a route now and switch any time from Settings. Short guides appear the first time you open each part of the app, and you can replay them from About whenever you want.</p>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:30px">
+            <div style="border:1px solid #403d3c;background:#221f1e;padding:15px;display:flex;align-items:center;gap:13px">
+              <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M1 14 C 6 4, 14 4, 19 14" fill="none" stroke="#62c5ee" stroke-width="1.5"></path><circle cx="19" cy="14" r="2.4" fill="#62c5ee"></circle></svg>
+              <span style="font:400 15px/1.35 'Source Serif 4',serif;color:#bab6b6">8D effects — what each mode does</span>
+            </div>
+            <div style="border:1px solid #403d3c;background:#221f1e;padding:15px;display:flex;align-items:center;gap:13px">
+              <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="4" width="16" height="1.7" fill="#62c5ee"></rect><rect x="2" y="9.2" width="16" height="1.7" fill="#62c5ee"></rect><rect x="2" y="14.4" width="10" height="1.7" fill="#62c5ee"></rect></svg>
+              <span style="font:400 15px/1.35 'Source Serif 4',serif;color:#bab6b6">Local player — building playlists</span>
+            </div>
+            <div style="border:1px solid #403d3c;background:#221f1e;padding:15px;display:flex;align-items:center;gap:13px">
+              <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2 L17 5.5 V10 C 17 14.4, 13.9 17, 10 18.4 C 6.1 17, 3 14.4, 3 10 V5.5 Z" fill="none" stroke="#ff458e" stroke-width="1.5"></path></svg>
+              <span style="font:400 15px/1.35 'Source Serif 4',serif;color:#bab6b6">Shizuku — the system-wide setup</span>
+            </div>
+          </div>
+
+          <div style="margin-top:auto;display:flex;flex-direction:column;gap:14px">
+            <button style="height:56px;width:100%;font:600 18px/1 'Source Serif 4',serif;background:#62c5ee;color:#0a303e;border:1px solid #62c5ee;cursor:pointer" style-active="opacity:0.85">Choose my source</button>
+            <div style="display:flex;align-items:center;gap:16px">
+              <div style="display:flex;gap:7px;flex:1">
+                <span style="width:26px;height:3px;background:#403d3c"></span>
+                <span style="width:26px;height:3px;background:#403d3c"></span>
+                <span style="width:26px;height:3px;background:#62c5ee"></span>
+              </div>
+              <button aria-label="Previous" style="flex:none;width:56px;height:52px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid #605d5d;cursor:pointer" style-hover="background:#262423">
+                <svg width="16" height="14" viewBox="0 0 16 14" aria-hidden="true"><path d="M11 1 L4 7 L11 13" fill="none" stroke="#f3f2f2" stroke-width="1.6"></path></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div id="2e" style="display:flex;flex-direction:column;gap:14px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font:600 12px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#f8f4f4;background:#201e1d;padding:6px 9px">2e</span>
+        <span style="font:600 17px/1 'Source Serif 4',serif">Guide · 8D effects</span>
+        <span style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">audible tour</span>
+      </div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 412 }}" height="{{ 892 }}" style="flex:none" hint-size="412px,892px">
+        <div data-screen-label="2e Guide effects" style="min-height:100%;background:#1a1918;color:#f3f2f2;display:flex;flex-direction:column;padding:20px 18px 26px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#62c5ee">GUIDE · 8D EFFECTS · 2 OF 5</span>
+            <button style="min-height:44px;padding:0 4px;font:400 15px/1 'Source Serif 4',serif;color:#bab6b6;background:transparent;border:none;cursor:pointer" style-hover="color:#f3f2f2">Close</button>
+          </div>
+
+          <div style="margin-top:26px;border:1px solid #62c5ee;background:#101f26;padding:20px 16px;display:flex;flex-direction:column;align-items:center;gap:16px">
+            <svg width="100%" height="180" viewBox="0 0 240 180" aria-hidden="true">
+              <circle cx="120" cy="90" r="70" fill="none" stroke="#403d3c" stroke-width="1"></circle>
+              <circle cx="120" cy="90" r="48" fill="none" stroke="#62c5ee" stroke-width="1.2" stroke-dasharray="4 4"></circle>
+              <path d="M120 42 A 48 48 0 0 1 160 66" fill="none" stroke="#62c5ee" stroke-width="2.4"></path>
+              <circle cx="120" cy="90" r="4" fill="#605d5d"></circle>
+              <circle cx="160" cy="66" r="8" fill="#e4e2e2"></circle>
+              <circle cx="146" cy="50" r="5.5" fill="#7d7979" opacity="0.45"></circle>
+              <circle cx="128" cy="43" r="4.5" fill="#605d5d" opacity="0.3"></circle>
+            </svg>
+            <button style="min-height:48px;padding:0 22px;display:flex;align-items:center;gap:11px;font:600 16px/1 'Source Serif 4',serif;background:#62c5ee;color:#0a303e;border:1px solid #62c5ee;cursor:pointer" style-active="opacity:0.85">
+              <svg width="13" height="14" viewBox="0 0 13 14" aria-hidden="true"><path d="M2 1 L2 13 L12 7 Z" fill="#0a303e"></path></svg>
+              Hear orbit
+            </button>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:26px">
+            <h2 style="margin:0;font:600 32px/1.03 'Source Serif 4',serif">Orbit</h2>
+            <p style="margin:0;font:400 17px/1.45 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">A steady circle around your head, the classic 8D sound. Speed sets how long one lap takes; distance decides whether it feels close to your ear or across the room.</p>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
+              <div style="display:flex;gap:11px;align-items:baseline">
+                <span style="font:600 15px/1.3 'Source Serif 4',serif;color:#62c5ee;white-space:nowrap">Best for</span>
+                <span style="font:400 15px/1.35 'Source Serif 4',serif;color:#bab6b6">most music, and the one to try first</span>
+              </div>
+              <div style="display:flex;gap:11px;align-items:baseline">
+                <span style="font:600 15px/1.3 'Source Serif 4',serif;color:#62c5ee;white-space:nowrap">Switch from</span>
+                <span style="font:400 15px/1.35 'Source Serif 4',serif;color:#bab6b6">Modes tab, or long-press the orbit on the player</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:auto;display:flex;align-items:center;gap:16px">
+            <div style="display:flex;gap:7px;flex:1">
+              <span style="width:18px;height:3px;background:#403d3c"></span>
+              <span style="width:18px;height:3px;background:#62c5ee"></span>
+              <span style="width:18px;height:3px;background:#403d3c"></span>
+              <span style="width:18px;height:3px;background:#403d3c"></span>
+              <span style="width:18px;height:3px;background:#403d3c"></span>
+            </div>
+            <button aria-label="Previous" style="flex:none;width:56px;height:52px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid #605d5d;cursor:pointer" style-hover="background:#262423">
+              <svg width="16" height="14" viewBox="0 0 16 14" aria-hidden="true"><path d="M11 1 L4 7 L11 13" fill="none" stroke="#f3f2f2" stroke-width="1.6"></path></svg>
+            </button>
+            <button aria-label="Next" style="flex:none;width:96px;height:52px;display:flex;align-items:center;justify-content:center;background:#62c5ee;border:1px solid #62c5ee;cursor:pointer" style-active="opacity:0.85">
+              <svg width="16" height="14" viewBox="0 0 16 14" aria-hidden="true"><path d="M5 1 L12 7 L5 13" fill="none" stroke="#0a303e" stroke-width="1.8"></path></svg>
+            </button>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div id="2f" style="display:flex;flex-direction:column;gap:14px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font:600 12px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#f8f4f4;background:#201e1d;padding:6px 9px">2f</span>
+        <span style="font:600 17px/1 'Source Serif 4',serif">Guide · Local player</span>
+        <span style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">first entry</span>
+      </div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 412 }}" height="{{ 892 }}" style="flex:none" hint-size="412px,892px">
+        <div data-screen-label="2f Guide local" style="min-height:100%;background:#1a1918;color:#f3f2f2;display:flex;flex-direction:column;padding:20px 18px 26px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#62c5ee">GUIDE · LOCAL PLAYER · 1 OF 4</span>
+            <button style="min-height:44px;padding:0 4px;font:400 15px/1 'Source Serif 4',serif;color:#bab6b6;background:transparent;border:none;cursor:pointer" style-hover="color:#f3f2f2">Close</button>
+          </div>
+
+          <div style="margin-top:26px;border:1px solid #403d3c;background:#221f1e;padding:16px;display:flex;flex-direction:column;gap:10px">
+            <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.16em;color:#7d7979">WHAT YOU'RE MAKING</span>
+            <div style="border:1px solid #605d5d;background:#1a1918;padding:13px;display:flex;align-items:center;gap:12px">
+              <div style="width:44px;height:44px;flex:none;background:#f3f2f2"></div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                <span style="font:600 16px/1.1 'Source Serif 4',serif">Night drive</span>
+                <span style="font:400 13px/1.1 'Source Serif 4',serif;color:#bab6b6">12 tracks · Deep space preset</span>
+              </div>
+              <span style="font:400 12px/1 'Source Serif 4',serif;color:#62c5ee;white-space:nowrap">8D on</span>
+            </div>
+            <div style="display:flex;gap:10px">
+              <div style="flex:1;border:1px solid #332f2f;padding:11px;display:flex;flex-direction:column;gap:3px">
+                <span style="font:400 13px/1.1 'Source Serif 4',serif;color:#9b9797">Gym spin</span>
+                <span style="font:400 12px/1.1 'Source Serif 4',serif;color:#7d7979">8 tracks</span>
+              </div>
+              <div style="flex:1;border:1px solid #332f2f;padding:11px;display:flex;flex-direction:column;gap:3px">
+                <span style="font:400 13px/1.1 'Source Serif 4',serif;color:#9b9797">Study</span>
+                <span style="font:400 12px/1.1 'Source Serif 4',serif;color:#7d7979">31 tracks</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:26px">
+            <h2 style="margin:0;font:600 32px/1.03 'Source Serif 4',serif">Playlists that carry their own sound</h2>
+            <p style="margin:0;font:400 17px/1.45 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">The local player always works — offline, and with every file on the phone. Each playlist can remember its own preset, so the effect changes with what you're listening to.</p>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:16px;margin-top:24px">
+            <div style="display:flex;gap:13px;align-items:flex-start">
+              <span style="flex:none;width:26px;height:26px;border-radius:50%;border:1px solid #62c5ee;color:#62c5ee;display:flex;align-items:center;justify-content:center;font:600 14px/1 'Source Serif 4',serif">1</span>
+              <span style="font:400 16px/1.35 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">Tap <span style="color:#f3f2f2">New playlist</span>, name it, pick tracks from your files.</span>
+            </div>
+            <div style="display:flex;gap:13px;align-items:flex-start">
+              <span style="flex:none;width:26px;height:26px;border-radius:50%;border:1px solid #62c5ee;color:#62c5ee;display:flex;align-items:center;justify-content:center;font:600 14px/1 'Source Serif 4',serif">2</span>
+              <span style="font:400 16px/1.35 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">Long-press any track to reorder, or add it to another playlist.</span>
+            </div>
+            <div style="display:flex;gap:13px;align-items:flex-start">
+              <span style="flex:none;width:26px;height:26px;border-radius:50%;border:1px solid #62c5ee;color:#62c5ee;display:flex;align-items:center;justify-content:center;font:600 14px/1 'Source Serif 4',serif">3</span>
+              <span style="font:400 16px/1.35 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">Attach a preset from the playlist menu — it loads every time you play it.</span>
+            </div>
+          </div>
+
+          <div style="margin-top:auto;display:flex;align-items:center;gap:16px;padding-top:24px">
+            <div style="display:flex;gap:7px;flex:1">
+              <span style="width:22px;height:3px;background:#62c5ee"></span>
+              <span style="width:22px;height:3px;background:#403d3c"></span>
+              <span style="width:22px;height:3px;background:#403d3c"></span>
+              <span style="width:22px;height:3px;background:#403d3c"></span>
+            </div>
+            <button aria-label="Previous" disabled="{{ true }}" style="flex:none;width:56px;height:52px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid #332f2f;cursor:not-allowed">
+              <svg width="16" height="14" viewBox="0 0 16 14" aria-hidden="true"><path d="M11 1 L4 7 L11 13" fill="none" stroke="#605d5d" stroke-width="1.6"></path></svg>
+            </button>
+            <button aria-label="Next" style="flex:none;width:96px;height:52px;display:flex;align-items:center;justify-content:center;background:#62c5ee;border:1px solid #62c5ee;cursor:pointer" style-active="opacity:0.85">
+              <svg width="16" height="14" viewBox="0 0 16 14" aria-hidden="true"><path d="M5 1 L12 7 L5 13" fill="none" stroke="#0a303e" stroke-width="1.8"></path></svg>
+            </button>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div id="2g" style="display:flex;flex-direction:column;gap:14px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font:600 12px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#f8f4f4;background:#201e1d;padding:6px 9px">2g</span>
+        <span style="font:600 17px/1 'Source Serif 4',serif">Guide · Shizuku</span>
+        <span style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">why, then how</span>
+      </div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 412 }}" height="{{ 892 }}" style="flex:none" hint-size="412px,892px">
+        <div data-screen-label="2g Guide shizuku" style="min-height:100%;background:#1a1918;color:#f3f2f2;display:flex;flex-direction:column;padding:20px 18px 26px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#ff458e">GUIDE · SHIZUKU · 1 OF 3</span>
+            <button style="min-height:44px;padding:0 4px;font:400 15px/1 'Source Serif 4',serif;color:#bab6b6;background:transparent;border:none;cursor:pointer" style-hover="color:#f3f2f2">Close</button>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:26px">
+            <h2 style="margin:0;font:600 32px/1.03 'Source Serif 4',serif">Why this step exists</h2>
+            <p style="margin:0;font:400 17px/1.45 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">Android won't let one app touch another app's audio unless it's given permission from a higher level. Shizuku is what grants that, without rooting the phone. It's the only way to get 8D on apps that block capture.</p>
+          </div>
+
+          <div style="margin-top:24px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;gap:14px;align-items:center;border:1px solid #332f2f;padding:14px">
+              <span style="flex:none;font:400 12px/1 'Source Serif 4',serif;letter-spacing:0.14em;color:#7d7979;width:74px">WITHOUT</span>
+              <span style="font:400 15px/1.35 'Source Serif 4',serif;color:#bab6b6">Works on the apps that allow capture, plus your local files</span>
+            </div>
+            <div style="display:flex;gap:14px;align-items:center;border:1px solid #ff458e;background:#2a0f1c;padding:14px">
+              <span style="flex:none;font:400 12px/1 'Source Serif 4',serif;letter-spacing:0.14em;color:#ff458e;width:74px">WITH</span>
+              <span style="font:400 15px/1.35 'Source Serif 4',serif;color:#f3f2f2">Works on everything the phone plays, no exceptions</span>
+            </div>
+          </div>
+
+          <div style="margin-top:26px;border:1px solid #403d3c;background:#221f1e;padding:16px;display:flex;flex-direction:column;gap:12px">
+            <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.16em;color:#9b9797">WHAT'S AHEAD</span>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <span style="font:400 15px/1.3 'Source Serif 4',serif;color:#bab6b6">1 · Install Shizuku from the Play Store</span>
+              <span style="font:400 15px/1.3 'Source Serif 4',serif;color:#bab6b6">2 · Turn on Developer options</span>
+              <span style="font:400 15px/1.3 'Source Serif 4',serif;color:#bab6b6">3 · Pair with wireless debugging</span>
+              <span style="font:400 15px/1.3 'Source Serif 4',serif;color:#bab6b6">4 · Grant 8D Music access</span>
+            </div>
+            <div style="height:1px;background:#332f2f"></div>
+            <span style="font:400 14px/1.4 'Source Serif 4',serif;color:#9b9797;text-wrap:pretty">Around five minutes, once. The next screen checks each step live and tells you exactly where you are.</span>
+          </div>
+
+          <div style="margin-top:20px;border:1px dashed #403d3c;padding:16px;display:flex;align-items:center;gap:13px">
+            <span style="flex:none;width:34px;height:34px;border:1px solid #605d5d;display:flex;align-items:center;justify-content:center">
+              <svg width="12" height="13" viewBox="0 0 12 13" aria-hidden="true"><path d="M2 1 L2 12 L11 6.5 Z" fill="#9b9797"></path></svg>
+            </span>
+            <span style="font:400 14px/1.35 'Source Serif 4',serif;color:#7d7979;text-wrap:pretty">Video walkthrough — coming in a later update</span>
+          </div>
+
+          <div style="margin-top:auto;display:flex;align-items:center;gap:16px;padding-top:24px">
+            <div style="display:flex;gap:7px;flex:1">
+              <span style="width:26px;height:3px;background:#ff458e"></span>
+              <span style="width:26px;height:3px;background:#403d3c"></span>
+              <span style="width:26px;height:3px;background:#403d3c"></span>
+            </div>
+            <button style="flex:1;height:52px;font:600 17px/1 'Source Serif 4',serif;background:#62c5ee;color:#0a303e;border:1px solid #62c5ee;cursor:pointer" style-active="opacity:0.85">Start setup</button>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div id="2h" style="display:flex;flex-direction:column;gap:14px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font:600 12px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#f8f4f4;background:#201e1d;padding:6px 9px">2h</span>
+        <span style="font:600 17px/1 'Source Serif 4',serif">About</span>
+        <span style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">story + replay guides</span>
+      </div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 412 }}" height="{{ 892 }}" style="flex:none" hint-size="412px,892px">
+        <div data-screen-label="2h About" style="min-height:100%;background:#1a1918;color:#f3f2f2;display:flex;flex-direction:column;padding:22px 18px 30px">
+          <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#62c5ee">ABOUT</span>
+          <h2 style="margin:12px 0 0;font:600 32px/1.03 'Source Serif 4',serif">Why I built 8D Music</h2>
+          <p style="margin:14px 0 0;font:400 16px/1.45 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">I kept hearing 8D edits online and wanted the effect on my own music — not a re-uploaded version of someone else's mix. Every tool I found was a website that made you upload a file and wait.</p>
+          <p style="margin:12px 0 0;font:400 16px/1.45 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">So this does it live, on the phone, on whatever is already playing. No uploads, no accounts required, no waiting. Different sources, same 8D experience — simple for everyone, and open for anyone who wants to go deeper.</p>
+
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:26px">
+            <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.16em;color:#7d7979">GUIDES — REPLAY ANY TIME</span>
+            <div style="display:flex;align-items:center;gap:13px;padding:15px 0;border-top:1px solid #262423">
+              <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M1 14 C 6 4, 14 4, 19 14" fill="none" stroke="#62c5ee" stroke-width="1.5"></path><circle cx="19" cy="14" r="2.4" fill="#62c5ee"></circle></svg>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                <span style="font:400 16px/1.2 'Source Serif 4',serif">The 8D effects</span>
+                <span style="font:400 13px/1.2 'Source Serif 4',serif;color:#7d7979">5 pages · with sound</span>
+              </div>
+              <span style="font:400 18px/1 'Source Serif 4',serif;color:#605d5d">›</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:13px;padding:15px 0;border-top:1px solid #262423">
+              <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="4" width="16" height="1.7" fill="#62c5ee"></rect><rect x="2" y="9.2" width="16" height="1.7" fill="#62c5ee"></rect><rect x="2" y="14.4" width="10" height="1.7" fill="#62c5ee"></rect></svg>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                <span style="font:400 16px/1.2 'Source Serif 4',serif">Local player &amp; playlists</span>
+                <span style="font:400 13px/1.2 'Source Serif 4',serif;color:#7d7979">4 pages</span>
+              </div>
+              <span style="font:400 18px/1 'Source Serif 4',serif;color:#605d5d">›</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:13px;padding:15px 0;border-top:1px solid #262423">
+              <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2 L17 5.5 V10 C 17 14.4, 13.9 17, 10 18.4 C 6.1 17, 3 14.4, 3 10 V5.5 Z" fill="none" stroke="#ff458e" stroke-width="1.5"></path></svg>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                <span style="font:400 16px/1.2 'Source Serif 4',serif">Shizuku setup</span>
+                <span style="font:400 13px/1.2 'Source Serif 4',serif;color:#62c5ee">Done — connected</span>
+              </div>
+              <span style="font:400 18px/1 'Source Serif 4',serif;color:#605d5d">›</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:13px;padding:15px 0;border-top:1px solid #262423;border-bottom:1px solid #262423">
+              <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="none" stroke="#9b9797" stroke-width="1.5"></circle><rect x="9.2" y="8.4" width="1.6" height="6" fill="#9b9797"></rect><rect x="9.2" y="5" width="1.6" height="1.9" fill="#9b9797"></rect></svg>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                <span style="font:400 16px/1.2 'Source Serif 4',serif">First-run introduction</span>
+                <span style="font:400 13px/1.2 'Source Serif 4',serif;color:#7d7979">3 pages</span>
+              </div>
+              <span style="font:400 18px/1 'Source Serif 4',serif;color:#605d5d">›</span>
+            </div>
+          </div>
+
+          <div style="margin-top:auto;display:flex;flex-direction:column;gap:12px;padding-top:26px">
+            <div style="display:flex;gap:10px">
+              <button style="flex:1;height:48px;font:400 15px/1 'Source Serif 4',serif;color:#bab6b6;background:#262423;border:1px solid #403d3c;cursor:pointer" style-hover="background:#332f2f">Send feedback</button>
+              <button style="flex:1;height:48px;font:400 15px/1 'Source Serif 4',serif;color:#bab6b6;background:#262423;border:1px solid #403d3c;cursor:pointer" style-hover="background:#332f2f">Rate the app</button>
+            </div>
+            <span style="font:400 13px/1.4 'Source Serif 4',serif;color:#7d7979">8D Music 1.0 · built by one person · signed in as you@gmail.com</span>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div id="2i" style="display:flex;flex-direction:column;gap:14px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font:600 12px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#f8f4f4;background:#201e1d;padding:6px 9px">2i</span>
+        <span style="font:600 17px/1 'Source Serif 4',serif">Capture blocked</span>
+        <span style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">the failure case</span>
+      </div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 412 }}" height="{{ 892 }}" style="flex:none" hint-size="412px,892px">
+        <div data-screen-label="2i Capture blocked" style="min-height:100%;background:#1a1918;color:#f3f2f2;display:flex;flex-direction:column">
+          <div style="padding:16px 18px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #332f2f">
+            <div style="display:flex;align-items:center;gap:9px">
+              <span style="width:8px;height:8px;border-radius:50%;background:#605d5d"></span>
+              <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.16em;color:#9b9797;white-space:nowrap">NO SIGNAL</span>
+            </div>
+            <span style="font:400 13px/1 'Source Serif 4',serif;color:#9b9797;white-space:nowrap">Direct capture · Spotify</span>
+          </div>
+
+          <div style="position:relative;width:300px;height:300px;margin:26px auto 0;opacity:0.35">
+            <div style="position:absolute;inset:0;border:1px solid #332f2f;border-radius:50%"></div>
+            <div style="position:absolute;left:50%;top:50%;width:170px;height:170px;margin:-85px 0 0 -85px;border:1px dashed #403d3c;border-radius:50%"></div>
+            <div style="position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border:1px solid #403d3c;border-radius:50%"></div>
+            <div style="position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:#605d5d"></div>
+          </div>
+
+          <div style="margin-top:auto;border-top:1px solid #403d3c;background:#221f1e;padding:22px 18px 26px;display:flex;flex-direction:column;gap:16px">
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#ff458e">CAPTURE REFUSED</span>
+              <h2 style="margin:0;font:600 27px/1.08 'Source Serif 4',serif">Spotify won't let apps capture its audio</h2>
+              <p style="margin:0;font:400 16px/1.4 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">Nothing is broken — this is the app's own restriction. Two ways around it:</p>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:11px">
+              <button style="width:100%;min-height:64px;padding:13px 15px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;background:#62c5ee;border:1px solid #62c5ee;cursor:pointer;text-align:left" style-active="opacity:0.85">
+                <span style="font:600 17px/1.1 'Source Serif 4',serif;color:#0a303e">Set up system-wide mode</span>
+                <span style="font:400 14px/1.2 'Source Serif 4',serif;color:#16455a">Five minutes, works on every app after that</span>
+              </button>
+              <button style="width:100%;min-height:64px;padding:13px 15px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;background:transparent;border:1px solid #605d5d;cursor:pointer;text-align:left" style-hover="background:#262423">
+                <span style="font:600 17px/1.1 'Source Serif 4',serif;color:#f3f2f2">Play from my own files instead</span>
+                <span style="font:400 14px/1.2 'Source Serif 4',serif;color:#bab6b6">Full 8D, offline, nothing to configure</span>
+              </button>
+            </div>
+            <button style="min-height:44px;font:400 15px/1 'Source Serif 4',serif;color:#9b9797;background:transparent;border:none;cursor:pointer" style-hover="color:#f3f2f2">Which apps allow capture?</button>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+  </div>
+</section>
+
+<section style="padding:52px 40px 90px;font-family:'Source Serif 4',Georgia,serif;color:#201e1d">
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:70ch">
+    <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#0088b0">TURN 1 · ANDROID APP · DARK INK</span>
+    <h1 style="margin:0;font:600 46px/1 'Source Serif 4',serif;letter-spacing:-0.01em">8D Music — full app</h1>
+    <p style="margin:0;font:400 18px/1.45 'Source Serif 4',serif;color:#605d5d;text-wrap:pretty">Eight screens covering the whole architecture: the three capture routes, the DSP engine surfaced as Modes / Effects / Presets, the local player, the Shizuku advanced path, and output. One bottom bar — Player, Modes, Presets, Library, Settings — with source and engine state always legible in the top strip.</p>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:44px;margin-top:46px">
+
+    <div id="1a" style="display:flex;flex-direction:column;gap:14px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font:600 12px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#f8f4f4;background:#201e1d;padding:6px 9px">1a</span>
+        <span style="font:600 17px/1 'Source Serif 4',serif">Choose your source</span>
+        <span style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">first run</span>
+      </div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 412 }}" height="{{ 892 }}" style="flex:none" hint-size="412px,892px">
+        <div data-screen-label="1a Source picker" style="min-height:100%;background:#1a1918;color:#f3f2f2;padding:22px 18px 30px;display:flex;flex-direction:column;gap:22px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <svg width="26" height="26" viewBox="0 0 512 512" role="img" aria-label="8D Music">
+              <rect x="148" y="200" width="44" height="92" rx="22" fill="#f3f2f2"></rect>
+              <rect x="211" y="143" width="44" height="149" rx="22" fill="#f3f2f2"></rect>
+              <rect x="274" y="175" width="44" height="117" rx="22" fill="#f3f2f2"></rect>
+              <rect x="339" y="228" width="44" height="64" rx="22" fill="#f3f2f2"></rect>
+              <path d="M104 320 C 170 382, 342 382, 412 316" fill="none" stroke="#62c5ee" stroke-width="30" stroke-linecap="round"></path>
+              <circle cx="102" cy="318" r="30" fill="#ff458e"></circle>
+            </svg>
+            <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#bab6b6;white-space:nowrap">8D MUSIC</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <h2 style="margin:0;font:600 32px/1.05 'Source Serif 4',serif">Where should the sound come from?</h2>
+            <p style="margin:0;font:400 16px/1.4 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">Pick one now, change it any time. Two of the three need no setup at all.</p>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="border:1px solid #62c5ee;background:#101f26;padding:16px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                <span style="font:600 19px/1.1 'Source Serif 4',serif">Direct capture</span>
+                <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.14em;color:#62c5ee;white-space:nowrap">NO SETUP</span>
+              </div>
+              <p style="margin:0;font:400 15px/1.35 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">Spatialises whatever app is playing, when that app permits playback capture.</p>
+              <div style="display:flex;gap:8px;margin-top:2px">
+                <span style="font:400 13px/1 'Source Serif 4',serif;color:#9b9797;border:1px solid #403d3c;padding:7px 10px">Spotify</span>
+                <span style="font:400 13px/1 'Source Serif 4',serif;color:#9b9797;border:1px solid #403d3c;padding:7px 10px">YouTube</span>
+                <span style="font:400 13px/1 'Source Serif 4',serif;color:#9b9797;border:1px solid #403d3c;padding:7px 10px">Games</span>
+              </div>
+            </div>
+
+            <div style="border:1px solid #403d3c;background:#221f1e;padding:16px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                <span style="font:600 19px/1.1 'Source Serif 4',serif">Local player</span>
+                <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.14em;color:#9b9797;white-space:nowrap">OFFLINE</span>
+              </div>
+              <p style="margin:0;font:400 15px/1.35 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">Play files from this device and build playlists. MP3, FLAC, WAV and more.</p>
+            </div>
+
+            <div style="border:1px solid #403d3c;background:#221f1e;padding:16px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                <span style="font:600 19px/1.1 'Source Serif 4',serif">System-wide (Shizuku)</span>
+                <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.14em;color:#ff458e;white-space:nowrap">ADVANCED</span>
+              </div>
+              <p style="margin:0;font:400 15px/1.35 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">Every app, no exceptions. Needs a one-time pairing through Developer options.</p>
+            </div>
+          </div>
+
+          <div style="margin-top:auto;display:flex;flex-direction:column;gap:12px">
+            <button style="height:52px;width:100%;font:600 17px/1 'Source Serif 4',serif;background:#62c5ee;color:#0a303e;border:1px solid #62c5ee;cursor:pointer" style-active="opacity:0.85">Continue with direct capture</button>
+            <button style="height:48px;width:100%;font:400 16px/1 'Source Serif 4',serif;background:transparent;color:#bab6b6;border:1px solid #403d3c;cursor:pointer" style-hover="background:#262423">Decide later</button>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div id="1b" style="display:flex;flex-direction:column;gap:14px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font:600 12px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#f8f4f4;background:#201e1d;padding:6px 9px">1b</span>
+        <span style="font:600 17px/1 'Source Serif 4',serif">Player</span>
+        <span style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">engine running</span>
+      </div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 412 }}" height="{{ 892 }}" style="flex:none" hint-size="412px,892px">
+        <div data-screen-label="1b Player" style="min-height:100%;background:#1a1918;color:#f3f2f2;display:flex;flex-direction:column">
+          <div style="padding:16px 18px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #332f2f">
+            <div style="display:flex;align-items:center;gap:9px">
+              <span style="width:8px;height:8px;border-radius:50%;background:#62c5ee"></span>
+              <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.16em;color:#62c5ee;white-space:nowrap">PROCESSING</span>
+            </div>
+            <span style="font:400 13px/1 'Source Serif 4',serif;color:#9b9797;white-space:nowrap">Direct capture · Spotify</span>
+          </div>
+
+          <div style="position:relative;width:340px;height:340px;margin:14px auto 0">
+            <div style="position:absolute;inset:0;border:1px solid #403d3c;border-radius:50%"></div>
+            <div style="position:absolute;inset:52px;border:1px solid #332f2f;border-radius:50%"></div>
+            <div style="position:absolute;left:50%;top:6px;bottom:6px;width:1px;background:#332f2f"></div>
+            <div style="position:absolute;top:50%;left:6px;right:6px;height:1px;background:#332f2f"></div>
+            <div style="position:absolute;left:50%;top:50%;width:196px;height:196px;margin:-98px 0 0 -98px;border:1px dashed #62c5ee;border-radius:50%"></div>
+            <div style="position:absolute;left:50%;top:50%;width:60px;height:60px;margin:-30px 0 0 -30px;border:1px solid #605d5d;border-radius:50%"></div>
+            <div style="position:absolute;left:50%;top:50%;width:0;height:0;margin:-7px 0 0 -5px;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:9px solid #9b9797"></div>
+            <div ref="{{ t2 }}" style="position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;background:#605d5d;opacity:0.3"></div>
+            <div ref="{{ t1 }}" style="position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#7d7979;opacity:0.45"></div>
+            <div ref="{{ dot }}" style="position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:#e4e2e2"></div>
+            <span style="position:absolute;left:50%;top:0;transform:translateX(-50%);font:400 10px/1 'Source Serif 4',serif;letter-spacing:0.2em;color:#7d7979;background:#1a1918;padding:0 6px">FRONT</span>
+            <span style="position:absolute;left:50%;bottom:0;transform:translateX(-50%);font:400 10px/1 'Source Serif 4',serif;letter-spacing:0.2em;color:#7d7979;background:#1a1918;padding:0 6px">BACK</span>
+            <span style="position:absolute;left:0;top:50%;transform:translateY(-50%);font:400 10px/1 'Source Serif 4',serif;color:#7d7979;background:#1a1918;padding:4px 0">L</span>
+            <span style="position:absolute;right:0;top:50%;transform:translateY(-50%);font:400 10px/1 'Source Serif 4',serif;color:#7d7979;background:#1a1918;padding:4px 0">R</span>
+          </div>
+
+          <div style="display:flex;align-items:baseline;gap:14px;padding:12px 18px 0">
+            <span ref="{{ ang }}" style="font:600 15px/1 'Source Serif 4',serif;color:#62c5ee">+0°</span>
+            <span style="font:400 15px/1 'Source Serif 4',serif;color:#bab6b6">1.00 m</span>
+            <span ref="{{ side }}" style="font:400 15px/1 'Source Serif 4',serif;color:#9b9797">centre</span>
+            <span style="font:400 13px/1 'Source Serif 4',serif;color:#7d7979;margin-left:auto;white-space:nowrap">Orbit · 8.3 s</span>
+          </div>
+
+          <div style="display:flex;gap:14px;padding:20px 18px 0">
+            <div style="width:60px;height:60px;flex:none;background:#f3f2f2;display:flex;align-items:center;justify-content:center">
+              <span style="font:400 20px/1 'Source Serif 4',serif;color:#201e1d">Le</span>
+            </div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
+              <span style="font:600 19px/1.1 'Source Serif 4',serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Khayi</span>
+              <span style="font:400 15px/1.1 'Source Serif 4',serif;color:#bab6b6">Lemchaheb</span>
+              <div style="display:flex;align-items:center;gap:10px;margin-top:3px">
+                <span style="font:400 12px/1 'Source Serif 4',serif;color:#9b9797">3:08</span>
+                <div style="position:relative;flex:1;height:3px;background:#403d3c">
+                  <div style="position:absolute;left:0;top:0;bottom:0;width:50%;background:#ff458e"></div>
+                  <div style="position:absolute;left:50%;top:50%;width:13px;height:13px;margin:-6.5px 0 0 -6.5px;border-radius:50%;background:#ff458e"></div>
+                </div>
+                <span style="font:400 12px/1 'Source Serif 4',serif;color:#9b9797">6:16</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;padding:18px 18px 0">
+            <button aria-label="Previous" style="flex:none;width:56px;height:50px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid #403d3c;cursor:pointer" style-hover="background:#262423">
+              <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><rect x="0" y="1" width="2.4" height="12" fill="#f3f2f2"></rect><path d="M17 1 L17 13 L5 7 Z" fill="#f3f2f2"></path></svg>
+            </button>
+            <button aria-label="Pause" style="flex:none;width:56px;height:50px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid #403d3c;cursor:pointer" style-hover="background:#262423">
+              <svg width="16" height="14" viewBox="0 0 16 14" aria-hidden="true"><rect x="2" y="1" width="3.6" height="12" fill="#f3f2f2"></rect><rect x="10" y="1" width="3.6" height="12" fill="#f3f2f2"></rect></svg>
+            </button>
+            <button aria-label="Next" style="flex:none;width:56px;height:50px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid #403d3c;cursor:pointer" style-hover="background:#262423">
+              <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1 L1 13 L13 7 Z" fill="#f3f2f2"></path><rect x="15.6" y="1" width="2.4" height="12" fill="#f3f2f2"></rect></svg>
+            </button>
+            <button style="flex:1;height:50px;font:600 17px/1 'Source Serif 4',serif;background:#262423;color:#99e0ff;border:1px solid #62c5ee;cursor:pointer" style-active="opacity:0.85">Stop 8D</button>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:16px;padding:24px 18px 0">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between">
+                <span style="font:400 16px/1.2 'Source Serif 4',serif">Speed</span>
+                <span style="font:600 15px/1.2 'Source Serif 4',serif;color:#62c5ee">0.12 rot/s</span>
+              </div>
+              <div style="position:relative;height:26px;display:flex;align-items:center">
+                <div style="position:absolute;left:0;right:0;height:3px;background:#403d3c"></div>
+                <div style="position:absolute;left:0;height:3px;width:22%;background:#62c5ee"></div>
+                <div style="position:absolute;left:22%;width:20px;height:20px;margin-left:-10px;border-radius:50%;background:#62c5ee"></div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between">
+                <span style="font:400 16px/1.2 'Source Serif 4',serif">Intensity</span>
+                <span style="font:600 15px/1.2 'Source Serif 4',serif;color:#62c5ee">85%</span>
+              </div>
+              <div style="position:relative;height:26px;display:flex;align-items:center">
+                <div style="position:absolute;left:0;right:0;height:3px;background:#403d3c"></div>
+                <div style="position:absolute;left:0;height:3px;width:85%;background:#62c5ee"></div>
+                <div style="position:absolute;left:85%;width:20px;height:20px;margin-left:-10px;border-radius:50%;background:#62c5ee"></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:auto;display:flex;border-top:1px solid #332f2f">
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;border-top:2px solid #62c5ee;margin-top:-1px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7.2" fill="none" stroke="#62c5ee" stroke-width="1.4"></circle><circle cx="9" cy="1.8" r="2.4" fill="#62c5ee"></circle></svg>
+              <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#62c5ee">PLAYER</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M1 12 C 5 4, 13 4, 17 12" fill="none" stroke="#9b9797" stroke-width="1.4"></path><circle cx="17" cy="12" r="2" fill="#9b9797"></circle></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">MODES</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 2 L11 7 L16 7 L12 10.5 L13.5 16 L9 12.8 L4.5 16 L6 10.5 L2 7 L7 7 Z" fill="none" stroke="#9b9797" stroke-width="1.3"></path></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">PRESETS</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="2" y="3.5" width="14" height="1.5" fill="#9b9797"></rect><rect x="2" y="8.2" width="14" height="1.5" fill="#9b9797"></rect><rect x="2" y="12.9" width="9" height="1.5" fill="#9b9797"></rect></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">LIBRARY</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="3" fill="none" stroke="#9b9797" stroke-width="1.4"></circle><circle cx="9" cy="9" r="7" fill="none" stroke="#9b9797" stroke-width="1.4" stroke-dasharray="2.6 2.6"></circle></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">SETTINGS</span>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div id="1c" style="display:flex;flex-direction:column;gap:14px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font:600 12px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#f8f4f4;background:#201e1d;padding:6px 9px">1c</span>
+        <span style="font:600 17px/1 'Source Serif 4',serif">Modes</span>
+        <span style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">movement paths</span>
+      </div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 412 }}" height="{{ 892 }}" style="flex:none" hint-size="412px,892px">
+        <div data-screen-label="1c Modes" style="min-height:100%;background:#1a1918;color:#f3f2f2;display:flex;flex-direction:column">
+          <div style="padding:22px 18px 16px;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid #332f2f">
+            <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#62c5ee">8D MODES</span>
+            <h2 style="margin:0;font:600 30px/1 'Source Serif 4',serif">How it moves</h2>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:18px">
+            <div style="border:1px solid #62c5ee;background:#101f26;padding:14px;display:flex;flex-direction:column;gap:10px">
+              <svg width="100%" height="76" viewBox="0 0 120 76" aria-hidden="true">
+                <circle cx="60" cy="38" r="26" fill="none" stroke="#62c5ee" stroke-width="1.2" stroke-dasharray="3 3"></circle>
+                <circle cx="60" cy="38" r="3" fill="#605d5d"></circle>
+                <circle cx="86" cy="38" r="5.5" fill="#62c5ee"></circle>
+              </svg>
+              <span style="font:600 17px/1 'Source Serif 4',serif">Orbit</span>
+              <span style="font:400 13px/1.3 'Source Serif 4',serif;color:#bab6b6">Full circle around your head</span>
+            </div>
+            <div style="border:1px solid #403d3c;background:#221f1e;padding:14px;display:flex;flex-direction:column;gap:10px">
+              <svg width="100%" height="76" viewBox="0 0 120 76" aria-hidden="true">
+                <path d="M22 30 Q 60 66, 98 30" fill="none" stroke="#605d5d" stroke-width="1.2" stroke-dasharray="3 3"></path>
+                <circle cx="60" cy="14" r="2.6" fill="#605d5d"></circle>
+                <line x1="60" y1="14" x2="98" y2="30" stroke="#403d3c" stroke-width="1"></line>
+                <circle cx="98" cy="30" r="5.5" fill="#9b9797"></circle>
+              </svg>
+              <span style="font:600 17px/1 'Source Serif 4',serif">Pendulum</span>
+              <span style="font:400 13px/1.3 'Source Serif 4',serif;color:#bab6b6">Swings left to right</span>
+            </div>
+            <div style="border:1px solid #403d3c;background:#221f1e;padding:14px;display:flex;flex-direction:column;gap:10px">
+              <svg width="100%" height="76" viewBox="0 0 120 76" aria-hidden="true">
+                <path d="M60 38 C 60 30, 70 30, 70 38 C 70 50, 52 50, 52 38 C 52 22, 80 22, 80 38 C 80 58, 44 58, 44 38" fill="none" stroke="#605d5d" stroke-width="1.2"></path>
+                <circle cx="44" cy="38" r="5.5" fill="#9b9797"></circle>
+              </svg>
+              <span style="font:600 17px/1 'Source Serif 4',serif">Spiral</span>
+              <span style="font:400 13px/1.3 'Source Serif 4',serif;color:#bab6b6">Drifts closer, then away</span>
+            </div>
+            <div style="border:1px solid #403d3c;background:#221f1e;padding:14px;display:flex;flex-direction:column;gap:10px">
+              <svg width="100%" height="76" viewBox="0 0 120 76" aria-hidden="true">
+                <path d="M40 24 C 24 38, 24 54, 40 54 C 56 54, 64 24, 80 24 C 96 24, 96 40, 80 40 C 64 40, 56 10, 40 24" fill="none" stroke="#605d5d" stroke-width="1.2"></path>
+                <circle cx="80" cy="40" r="5.5" fill="#9b9797"></circle>
+              </svg>
+              <span style="font:600 17px/1 'Source Serif 4',serif">Figure eight</span>
+              <span style="font:400 13px/1.3 'Source Serif 4',serif;color:#bab6b6">Crosses through the centre</span>
+            </div>
+          </div>
+
+          <div style="padding:0 18px;display:flex;flex-direction:column;gap:20px">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between">
+                <span style="font:400 17px/1.2 'Source Serif 4',serif">Speed</span>
+                <span style="font:600 16px/1.2 'Source Serif 4',serif;color:#62c5ee">0.12 rot/s · 8.3 s</span>
+              </div>
+              <div style="position:relative;height:30px;display:flex;align-items:center">
+                <div style="position:absolute;left:0;right:0;height:3px;background:#403d3c"></div>
+                <div style="position:absolute;left:0;height:3px;width:22%;background:#62c5ee"></div>
+                <div style="position:absolute;left:22%;width:20px;height:20px;margin-left:-10px;border-radius:50%;background:#62c5ee"></div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between">
+                <span style="font:400 17px/1.2 'Source Serif 4',serif">Distance</span>
+                <span style="font:600 16px/1.2 'Source Serif 4',serif;color:#62c5ee">1.00 m</span>
+              </div>
+              <div style="position:relative;height:30px;display:flex;align-items:center">
+                <div style="position:absolute;left:0;right:0;height:3px;background:#403d3c"></div>
+                <div style="position:absolute;left:0;height:3px;width:34%;background:#62c5ee"></div>
+                <div style="position:absolute;left:34%;width:20px;height:20px;margin-left:-10px;border-radius:50%;background:#62c5ee"></div>
+              </div>
+              <span style="font:400 13px/1.35 'Source Serif 4',serif;color:#9b9797">Virtual distance — changes level, tone and room</span>
+            </div>
+            <label style="display:flex;align-items:center;gap:12px;min-height:48px;cursor:pointer">
+              <span style="width:22px;height:22px;flex:none;display:flex;align-items:center;justify-content:center;border:1px solid #62c5ee;background:#62c5ee;color:#0a303e;font:400 13px/1 'Source Serif 4',serif">✓</span>
+              <span style="font:400 16px/1.3 'Source Serif 4',serif">Spatial audio (ITD / ILD / HRTF)</span>
+            </label>
+            <div style="border:1px solid #403d3c;background:#221f1e;padding:14px;font:400 14px/1.4 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">HRTF is available on this device. Without it, the engine falls back to time and level differences only.</div>
+          </div>
+
+          <div style="margin-top:auto;display:flex;border-top:1px solid #332f2f">
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7.2" fill="none" stroke="#9b9797" stroke-width="1.4"></circle><circle cx="9" cy="1.8" r="2.4" fill="#9b9797"></circle></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">PLAYER</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;border-top:2px solid #62c5ee;margin-top:-1px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M1 12 C 5 4, 13 4, 17 12" fill="none" stroke="#62c5ee" stroke-width="1.4"></path><circle cx="17" cy="12" r="2" fill="#62c5ee"></circle></svg>
+              <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#62c5ee">MODES</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 2 L11 7 L16 7 L12 10.5 L13.5 16 L9 12.8 L4.5 16 L6 10.5 L2 7 L7 7 Z" fill="none" stroke="#9b9797" stroke-width="1.3"></path></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">PRESETS</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="2" y="3.5" width="14" height="1.5" fill="#9b9797"></rect><rect x="2" y="8.2" width="14" height="1.5" fill="#9b9797"></rect><rect x="2" y="12.9" width="9" height="1.5" fill="#9b9797"></rect></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">LIBRARY</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="3" fill="none" stroke="#9b9797" stroke-width="1.4"></circle><circle cx="9" cy="9" r="7" fill="none" stroke="#9b9797" stroke-width="1.4" stroke-dasharray="2.6 2.6"></circle></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">SETTINGS</span>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div id="1d" style="display:flex;flex-direction:column;gap:14px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font:600 12px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#f8f4f4;background:#201e1d;padding:6px 9px">1d</span>
+        <span style="font:600 17px/1 'Source Serif 4',serif">Effects &amp; space</span>
+        <span style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">DSP engine</span>
+      </div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 412 }}" height="{{ 892 }}" style="flex:none" hint-size="412px,892px">
+        <div data-screen-label="1d Effects" style="min-height:100%;background:#1a1918;color:#f3f2f2;display:flex;flex-direction:column">
+          <div style="padding:22px 18px 16px;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid #332f2f">
+            <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#62c5ee">EFFECTS</span>
+            <h2 style="margin:0;font:600 30px/1 'Source Serif 4',serif">Room and colour</h2>
+          </div>
+
+          <div style="display:flex;gap:8px;padding:16px 18px 0;overflow-x:auto;scrollbar-width:none">
+            <span style="flex:none;font:400 15px/1 'Source Serif 4',serif;color:#99e0ff;border:1px solid #62c5ee;background:#0a303e;padding:12px 15px;white-space:nowrap">Clean</span>
+            <span style="flex:none;font:400 15px/1 'Source Serif 4',serif;color:#f3f2f2;border:1px solid #403d3c;padding:12px 15px;white-space:nowrap">Warm tape</span>
+            <span style="flex:none;font:400 15px/1 'Source Serif 4',serif;color:#f3f2f2;border:1px solid #403d3c;padding:12px 15px;white-space:nowrap">Vinyl</span>
+            <span style="flex:none;font:400 15px/1 'Source Serif 4',serif;color:#f3f2f2;border:1px solid #403d3c;padding:12px 15px;white-space:nowrap">Radio</span>
+          </div>
+
+          <div style="padding:22px 18px 0;display:flex;flex-direction:column;gap:20px">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between">
+                <span style="font:400 17px/1.2 'Source Serif 4',serif">Reverb</span>
+                <span style="font:600 16px/1.2 'Source Serif 4',serif;color:#62c5ee">18%</span>
+              </div>
+              <div style="position:relative;height:30px;display:flex;align-items:center">
+                <div style="position:absolute;left:0;right:0;height:3px;background:#403d3c"></div>
+                <div style="position:absolute;left:0;height:3px;width:18%;background:#62c5ee"></div>
+                <div style="position:absolute;left:18%;width:20px;height:20px;margin-left:-10px;border-radius:50%;background:#62c5ee"></div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between">
+                <span style="font:400 17px/1.2 'Source Serif 4',serif">Delay</span>
+                <span style="font:600 16px/1.2 'Source Serif 4',serif;color:#62c5ee">0% · 280 ms</span>
+              </div>
+              <div style="position:relative;height:30px;display:flex;align-items:center">
+                <div style="position:absolute;left:0;right:0;height:3px;background:#403d3c"></div>
+                <div style="position:absolute;left:0;width:20px;height:20px;margin-left:-10px;border-radius:50%;background:#605d5d"></div>
+              </div>
+              <span style="font:400 13px/1.35 'Source Serif 4',serif;color:#9b9797">Off — raise to hear the repeats travel with the source</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between">
+                <span style="font:400 17px/1.2 'Source Serif 4',serif">Stereo width</span>
+                <span style="font:600 16px/1.2 'Source Serif 4',serif;color:#62c5ee">100%</span>
+              </div>
+              <div style="position:relative;height:30px;display:flex;align-items:center">
+                <div style="position:absolute;left:0;right:0;height:3px;background:#403d3c"></div>
+                <div style="position:absolute;left:0;height:3px;width:50%;background:#62c5ee"></div>
+                <div style="position:absolute;left:50%;width:20px;height:20px;margin-left:-10px;border-radius:50%;background:#62c5ee"></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:26px 18px 0;display:flex;flex-direction:column;gap:12px">
+            <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#62c5ee">EQUALISER</span>
+            <div style="display:flex;align-items:flex-end;gap:12px;height:150px;border-bottom:1px solid #332f2f;padding-bottom:2px">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end">
+                <span style="font:600 15px/1 'Source Serif 4',serif;color:#62c5ee">+3</span>
+                <div style="width:8px;height:70%;background:#62c5ee"></div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end">
+                <span style="font:600 15px/1 'Source Serif 4',serif;color:#62c5ee">0</span>
+                <div style="width:8px;height:50%;background:#605d5d"></div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end">
+                <span style="font:600 15px/1 'Source Serif 4',serif;color:#62c5ee">+1</span>
+                <div style="width:8px;height:58%;background:#62c5ee"></div>
+              </div>
+            </div>
+            <div style="display:flex;gap:12px">
+              <span style="flex:1;text-align:center;font:400 14px/1 'Source Serif 4',serif;color:#bab6b6">Bass</span>
+              <span style="flex:1;text-align:center;font:400 14px/1 'Source Serif 4',serif;color:#bab6b6">Mid</span>
+              <span style="flex:1;text-align:center;font:400 14px/1 'Source Serif 4',serif;color:#bab6b6">Treble</span>
+            </div>
+          </div>
+
+          <div style="padding:24px 18px 24px">
+            <button style="height:50px;width:100%;font:400 16px/1 'Source Serif 4',serif;color:#bab6b6;background:#262423;border:1px solid #403d3c;cursor:pointer" style-hover="background:#332f2f">Save as preset</button>
+          </div>
+
+          <div style="margin-top:auto;display:flex;border-top:1px solid #332f2f">
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7.2" fill="none" stroke="#9b9797" stroke-width="1.4"></circle><circle cx="9" cy="1.8" r="2.4" fill="#9b9797"></circle></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">PLAYER</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;border-top:2px solid #62c5ee;margin-top:-1px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M1 12 C 5 4, 13 4, 17 12" fill="none" stroke="#62c5ee" stroke-width="1.4"></path><circle cx="17" cy="12" r="2" fill="#62c5ee"></circle></svg>
+              <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#62c5ee">MODES</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 2 L11 7 L16 7 L12 10.5 L13.5 16 L9 12.8 L4.5 16 L6 10.5 L2 7 L7 7 Z" fill="none" stroke="#9b9797" stroke-width="1.3"></path></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">PRESETS</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="2" y="3.5" width="14" height="1.5" fill="#9b9797"></rect><rect x="2" y="8.2" width="14" height="1.5" fill="#9b9797"></rect><rect x="2" y="12.9" width="9" height="1.5" fill="#9b9797"></rect></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">LIBRARY</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="3" fill="none" stroke="#9b9797" stroke-width="1.4"></circle><circle cx="9" cy="9" r="7" fill="none" stroke="#9b9797" stroke-width="1.4" stroke-dasharray="2.6 2.6"></circle></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">SETTINGS</span>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div id="1e" style="display:flex;flex-direction:column;gap:14px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font:600 12px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#f8f4f4;background:#201e1d;padding:6px 9px">1e</span>
+        <span style="font:600 17px/1 'Source Serif 4',serif">Presets</span>
+        <span style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">save &amp; load</span>
+      </div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 412 }}" height="{{ 892 }}" style="flex:none" hint-size="412px,892px">
+        <div data-screen-label="1e Presets" style="min-height:100%;background:#1a1918;color:#f3f2f2;display:flex;flex-direction:column">
+          <div style="padding:22px 18px 16px;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid #332f2f">
+            <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#62c5ee">PRESETS</span>
+            <h2 style="margin:0;font:600 30px/1 'Source Serif 4',serif">Your settings, kept</h2>
+          </div>
+
+          <div style="padding:18px 18px 0;display:flex;flex-direction:column;gap:10px">
+            <span style="font:400 13px/1 'Source Serif 4',serif;letter-spacing:0.14em;color:#9b9797">YOURS</span>
+            <div style="border:1px solid #62c5ee;background:#101f26;padding:15px;display:flex;align-items:center;gap:14px">
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
+                <span style="font:600 18px/1.1 'Source Serif 4',serif">Night bus</span>
+                <span style="font:400 14px/1.2 'Source Serif 4',serif;color:#bab6b6">Orbit · 0.07 rot/s · 1.6 m · reverb 34%</span>
+              </div>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.14em;color:#62c5ee;white-space:nowrap">LOADED</span>
+            </div>
+            <div style="border:1px solid #403d3c;background:#221f1e;padding:15px;display:flex;flex-direction:column;gap:5px">
+              <span style="font:600 18px/1.1 'Source Serif 4',serif">Gym spin</span>
+              <span style="font:400 14px/1.2 'Source Serif 4',serif;color:#bab6b6">Orbit · 0.30 rot/s · 0.8 m · bass +5</span>
+            </div>
+            <div style="border:1px solid #403d3c;background:#221f1e;padding:15px;display:flex;flex-direction:column;gap:5px">
+              <span style="font:600 18px/1.1 'Source Serif 4',serif">Studio check</span>
+              <span style="font:400 14px/1.2 'Source Serif 4',serif;color:#bab6b6">Static · +0° · clean · width 100%</span>
+            </div>
+          </div>
+
+          <div style="padding:24px 18px 0;display:flex;flex-direction:column;gap:10px">
+            <span style="font:400 13px/1 'Source Serif 4',serif;letter-spacing:0.14em;color:#9b9797">BUILT IN</span>
+            <div style="border:1px solid #403d3c;padding:15px;display:flex;flex-direction:column;gap:5px">
+              <span style="font:600 18px/1.1 'Source Serif 4',serif">Classic 8D</span>
+              <span style="font:400 14px/1.2 'Source Serif 4',serif;color:#bab6b6">The sound most people mean by 8D</span>
+            </div>
+            <div style="border:1px solid #403d3c;padding:15px;display:flex;flex-direction:column;gap:5px">
+              <span style="font:600 18px/1.1 'Source Serif 4',serif">Wide cinema</span>
+              <span style="font:400 14px/1.2 'Source Serif 4',serif;color:#bab6b6">Slow, distant, counter-clockwise</span>
+            </div>
+            <div style="border:1px solid #403d3c;padding:15px;display:flex;flex-direction:column;gap:5px">
+              <span style="font:600 18px/1.1 'Source Serif 4',serif">Deep space</span>
+              <span style="font:400 14px/1.2 'Source Serif 4',serif;color:#bab6b6">Far orbit, big room, long tail</span>
+            </div>
+            <div style="border:1px solid #403d3c;padding:15px;display:flex;flex-direction:column;gap:5px">
+              <span style="font:600 18px/1.1 'Source Serif 4',serif">Subtle motion</span>
+              <span style="font:400 14px/1.2 'Source Serif 4',serif;color:#bab6b6">For long listening — barely there</span>
+            </div>
+          </div>
+
+          <div style="padding:24px 18px 24px;display:flex;gap:10px">
+            <button style="flex:1;height:50px;font:600 16px/1 'Source Serif 4',serif;background:#62c5ee;color:#0a303e;border:1px solid #62c5ee;cursor:pointer" style-active="opacity:0.85">Save current</button>
+            <button style="flex:none;width:110px;height:50px;font:400 16px/1 'Source Serif 4',serif;color:#bab6b6;background:transparent;border:1px solid #403d3c;cursor:pointer" style-hover="background:#262423">Import</button>
+          </div>
+
+          <div style="margin-top:auto;display:flex;border-top:1px solid #332f2f">
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7.2" fill="none" stroke="#9b9797" stroke-width="1.4"></circle><circle cx="9" cy="1.8" r="2.4" fill="#9b9797"></circle></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">PLAYER</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M1 12 C 5 4, 13 4, 17 12" fill="none" stroke="#9b9797" stroke-width="1.4"></path><circle cx="17" cy="12" r="2" fill="#9b9797"></circle></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">MODES</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;border-top:2px solid #62c5ee;margin-top:-1px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 2 L11 7 L16 7 L12 10.5 L13.5 16 L9 12.8 L4.5 16 L6 10.5 L2 7 L7 7 Z" fill="#62c5ee"></path></svg>
+              <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#62c5ee">PRESETS</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="2" y="3.5" width="14" height="1.5" fill="#9b9797"></rect><rect x="2" y="8.2" width="14" height="1.5" fill="#9b9797"></rect><rect x="2" y="12.9" width="9" height="1.5" fill="#9b9797"></rect></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">LIBRARY</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="3" fill="none" stroke="#9b9797" stroke-width="1.4"></circle><circle cx="9" cy="9" r="7" fill="none" stroke="#9b9797" stroke-width="1.4" stroke-dasharray="2.6 2.6"></circle></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">SETTINGS</span>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div id="1f" style="display:flex;flex-direction:column;gap:14px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font:600 12px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#f8f4f4;background:#201e1d;padding:6px 9px">1f</span>
+        <span style="font:600 17px/1 'Source Serif 4',serif">Library</span>
+        <span style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">local player</span>
+      </div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 412 }}" height="{{ 892 }}" style="flex:none" hint-size="412px,892px">
+        <div data-screen-label="1f Library" style="min-height:100%;background:#1a1918;color:#f3f2f2;display:flex;flex-direction:column">
+          <div style="padding:22px 18px 16px;display:flex;flex-direction:column;gap:6px">
+            <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#62c5ee">LIBRARY</span>
+            <h2 style="margin:0;font:600 30px/1 'Source Serif 4',serif">On this device</h2>
+          </div>
+          <div style="display:flex;gap:0;padding:0 18px;border-bottom:1px solid #332f2f">
+            <span style="flex:1;min-height:46px;display:flex;align-items:center;justify-content:center;font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#62c5ee;border-bottom:2px solid #62c5ee;margin-bottom:-1px">TRACKS</span>
+            <span style="flex:1;min-height:46px;display:flex;align-items:center;justify-content:center;font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#9b9797">PLAYLISTS</span>
+            <span style="flex:1;min-height:46px;display:flex;align-items:center;justify-content:center;font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#9b9797">FOLDERS</span>
+          </div>
+
+          <div style="padding:14px 18px 0;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #262423">
+              <div style="width:48px;height:48px;flex:none;background:#f3f2f2;display:flex;align-items:center;justify-content:center;font:400 16px/1 'Source Serif 4',serif;color:#201e1d">Le</div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                <span style="font:600 17px/1.1 'Source Serif 4',serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Khayi</span>
+                <span style="font:400 14px/1.1 'Source Serif 4',serif;color:#bab6b6">Lemchaheb · FLAC</span>
+              </div>
+              <span style="font:400 13px/1 'Source Serif 4',serif;color:#62c5ee;white-space:nowrap">6:16</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #262423">
+              <div style="width:48px;height:48px;flex:none;background:#332f2f"></div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                <span style="font:400 17px/1.1 'Source Serif 4',serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Aïta remix</span>
+                <span style="font:400 14px/1.1 'Source Serif 4',serif;color:#bab6b6">Unknown artist · MP3</span>
+              </div>
+              <span style="font:400 13px/1 'Source Serif 4',serif;color:#9b9797;white-space:nowrap">4:02</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #262423">
+              <div style="width:48px;height:48px;flex:none;background:#332f2f"></div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                <span style="font:400 17px/1.1 'Source Serif 4',serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Late tape 03</span>
+                <span style="font:400 14px/1.1 'Source Serif 4',serif;color:#bab6b6">Field recording · WAV</span>
+              </div>
+              <span style="font:400 13px/1 'Source Serif 4',serif;color:#9b9797;white-space:nowrap">9:48</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #262423">
+              <div style="width:48px;height:48px;flex:none;background:#332f2f"></div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                <span style="font:400 17px/1.1 'Source Serif 4',serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Chaabi night</span>
+                <span style="font:400 14px/1.1 'Source Serif 4',serif;color:#bab6b6">Various · MP3</span>
+              </div>
+              <span style="font:400 13px/1 'Source Serif 4',serif;color:#9b9797;white-space:nowrap">5:31</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #262423">
+              <div style="width:48px;height:48px;flex:none;background:#332f2f"></div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                <span style="font:400 17px/1.1 'Source Serif 4',serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Gnawa loop</span>
+                <span style="font:400 14px/1.1 'Source Serif 4',serif;color:#bab6b6">Unknown artist · FLAC</span>
+              </div>
+              <span style="font:400 13px/1 'Source Serif 4',serif;color:#9b9797;white-space:nowrap">7:12</span>
+            </div>
+          </div>
+
+          <div style="padding:20px 18px 0">
+            <button style="height:50px;width:100%;font:400 16px/1 'Source Serif 4',serif;color:#bab6b6;background:#262423;border:1px solid #403d3c;cursor:pointer" style-hover="background:#332f2f">New playlist</button>
+          </div>
+
+          <div style="margin-top:auto">
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 18px;border-top:1px solid #332f2f;background:#221f1e">
+              <div style="width:42px;height:42px;flex:none;background:#f3f2f2;display:flex;align-items:center;justify-content:center;font:400 14px/1 'Source Serif 4',serif;color:#201e1d">Le</div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                <span style="font:600 15px/1.1 'Source Serif 4',serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Khayi</span>
+                <span style="font:400 12px/1 'Source Serif 4',serif;color:#62c5ee">8D on · orbit</span>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="1" y="1" width="3.2" height="12" fill="#f3f2f2"></rect><rect x="8.5" y="1" width="3.2" height="12" fill="#f3f2f2"></rect></svg>
+            </div>
+            <div style="display:flex;border-top:1px solid #332f2f">
+              <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+                <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7.2" fill="none" stroke="#9b9797" stroke-width="1.4"></circle><circle cx="9" cy="1.8" r="2.4" fill="#9b9797"></circle></svg>
+                <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">PLAYER</span>
+              </div>
+              <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+                <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M1 12 C 5 4, 13 4, 17 12" fill="none" stroke="#9b9797" stroke-width="1.4"></path><circle cx="17" cy="12" r="2" fill="#9b9797"></circle></svg>
+                <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">MODES</span>
+              </div>
+              <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+                <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 2 L11 7 L16 7 L12 10.5 L13.5 16 L9 12.8 L4.5 16 L6 10.5 L2 7 L7 7 Z" fill="none" stroke="#9b9797" stroke-width="1.3"></path></svg>
+                <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">PRESETS</span>
+              </div>
+              <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;border-top:2px solid #62c5ee;margin-top:-1px">
+                <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="2" y="3.5" width="14" height="1.5" fill="#62c5ee"></rect><rect x="2" y="8.2" width="14" height="1.5" fill="#62c5ee"></rect><rect x="2" y="12.9" width="9" height="1.5" fill="#62c5ee"></rect></svg>
+                <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#62c5ee">LIBRARY</span>
+              </div>
+              <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+                <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="3" fill="none" stroke="#9b9797" stroke-width="1.4"></circle><circle cx="9" cy="9" r="7" fill="none" stroke="#9b9797" stroke-width="1.4" stroke-dasharray="2.6 2.6"></circle></svg>
+                <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">SETTINGS</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div id="1g" style="display:flex;flex-direction:column;gap:14px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font:600 12px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#f8f4f4;background:#201e1d;padding:6px 9px">1g</span>
+        <span style="font:600 17px/1 'Source Serif 4',serif">Shizuku setup</span>
+        <span style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">advanced mode</span>
+      </div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 412 }}" height="{{ 892 }}" style="flex:none" hint-size="412px,892px">
+        <div data-screen-label="1g Shizuku setup" style="min-height:100%;background:#1a1918;color:#f3f2f2;display:flex;flex-direction:column;padding-bottom:24px">
+          <div style="padding:22px 18px 16px;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid #332f2f">
+            <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#ff458e">ADVANCED MODE</span>
+            <h2 style="margin:0;font:600 30px/1 'Source Serif 4',serif">System-wide audio</h2>
+            <p style="margin:4px 0 0;font:400 15px/1.4 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">Four steps, once. After this every app on the phone can be spatialised — including the ones that block capture.</p>
+          </div>
+
+          <div style="padding:20px 18px 0;display:flex;flex-direction:column;gap:0">
+            <div style="display:flex;gap:14px;padding-bottom:20px;border-left:1px solid #332f2f;margin-left:15px;padding-left:20px;position:relative">
+              <span style="position:absolute;left:-16px;top:0;width:31px;height:31px;border-radius:50%;background:#62c5ee;color:#0a303e;display:flex;align-items:center;justify-content:center;font:600 15px/1 'Source Serif 4',serif">✓</span>
+              <div style="display:flex;flex-direction:column;gap:5px;padding-left:22px">
+                <span style="font:600 18px/1.15 'Source Serif 4',serif">Install Shizuku</span>
+                <span style="font:400 14px/1.35 'Source Serif 4',serif;color:#bab6b6">Found on this device — version 13.5.4</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:14px;padding-bottom:20px;border-left:1px solid #332f2f;margin-left:15px;padding-left:20px;position:relative">
+              <span style="position:absolute;left:-16px;top:0;width:31px;height:31px;border-radius:50%;background:#62c5ee;color:#0a303e;display:flex;align-items:center;justify-content:center;font:600 15px/1 'Source Serif 4',serif">✓</span>
+              <div style="display:flex;flex-direction:column;gap:5px;padding-left:22px">
+                <span style="font:600 18px/1.15 'Source Serif 4',serif">Turn on Developer options</span>
+                <span style="font:400 14px/1.35 'Source Serif 4',serif;color:#bab6b6">Settings › About phone › tap Build number seven times</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:14px;padding-bottom:20px;border-left:1px solid #332f2f;margin-left:15px;padding-left:20px;position:relative">
+              <span style="position:absolute;left:-16px;top:0;width:31px;height:31px;border-radius:50%;background:#ff458e;color:#1a1918;display:flex;align-items:center;justify-content:center;font:600 15px/1 'Source Serif 4',serif">3</span>
+              <div style="display:flex;flex-direction:column;gap:9px;padding-left:22px">
+                <span style="font:600 18px/1.15 'Source Serif 4',serif">Pair over wireless debugging</span>
+                <span style="font:400 14px/1.35 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">Open Developer options › Wireless debugging › Pair device with pairing code, then paste the code here.</span>
+                <div style="display:flex;gap:9px;margin-top:2px">
+                  <div style="flex:1;height:52px;border:1px solid #62c5ee;background:#101f26;display:flex;align-items:center;padding:0 13px;font:400 18px/1 'Source Serif 4',serif;letter-spacing:0.28em;color:#f3f2f2">417 6</div>
+                  <button style="flex:none;width:104px;height:52px;font:600 16px/1 'Source Serif 4',serif;background:#62c5ee;color:#0a303e;border:1px solid #62c5ee;cursor:pointer" style-active="opacity:0.85">Pair</button>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;gap:14px;margin-left:15px;padding-left:20px;position:relative">
+              <span style="position:absolute;left:-16px;top:0;width:31px;height:31px;border-radius:50%;border:1px solid #605d5d;color:#9b9797;display:flex;align-items:center;justify-content:center;font:600 15px/1 'Source Serif 4',serif">4</span>
+              <div style="display:flex;flex-direction:column;gap:5px;padding-left:22px">
+                <span style="font:600 18px/1.15 'Source Serif 4',serif;color:#bab6b6">Grant 8D Music access</span>
+                <span style="font:400 14px/1.35 'Source Serif 4',serif;color:#9b9797">Shizuku will ask once. Nothing leaves the device.</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin:26px 18px 0;border:1px solid #403d3c;background:#221f1e;padding:15px;display:flex;flex-direction:column;gap:6px">
+            <span style="font:600 15px/1.15 'Source Serif 4',serif">Don't want to do this?</span>
+            <span style="font:400 14px/1.4 'Source Serif 4',serif;color:#bab6b6;text-wrap:pretty">Direct capture and the local player need none of it — you keep full 8D on most of what you listen to.</span>
+          </div>
+
+          <div style="padding:20px 18px 0">
+            <button style="height:50px;width:100%;font:400 16px/1 'Source Serif 4',serif;color:#bab6b6;background:transparent;border:1px solid #403d3c;cursor:pointer" style-hover="background:#262423">Skip for now</button>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <div id="1h" style="display:flex;flex-direction:column;gap:14px;flex:none">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <span style="font:600 12px/1 'Source Serif 4',serif;letter-spacing:0.1em;color:#f8f4f4;background:#201e1d;padding:6px 9px">1h</span>
+        <span style="font:600 17px/1 'Source Serif 4',serif">Settings</span>
+        <span style="font:400 15px/1 'Source Serif 4',serif;color:#7d7979">source &amp; output</span>
+      </div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" width="{{ 412 }}" height="{{ 892 }}" style="flex:none" hint-size="412px,892px">
+        <div data-screen-label="1h Settings" style="min-height:100%;background:#1a1918;color:#f3f2f2;display:flex;flex-direction:column">
+          <div style="padding:22px 18px 16px;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid #332f2f">
+            <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.18em;color:#62c5ee">SETTINGS</span>
+            <h2 style="margin:0;font:600 30px/1 'Source Serif 4',serif">Source &amp; output</h2>
+          </div>
+
+          <div style="padding:20px 18px 0;display:flex;flex-direction:column;gap:18px">
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <span style="font:400 13px/1 'Source Serif 4',serif;color:#bab6b6">Audio source</span>
+              <div style="position:relative">
+                <select style="width:100%;height:50px;padding:0 38px 0 13px;font:400 16px/1 'Source Serif 4',serif;color:#f3f2f2;background:#262423;border:1px solid #605d5d">
+                  <option>Direct capture</option>
+                  <option>Local player</option>
+                  <option>System-wide (Shizuku)</option>
+                </select>
+                <span style="position:absolute;right:13px;top:50%;transform:translateY(-50%);pointer-events:none;font:400 10px/1 'Source Serif 4',serif;color:#bab6b6">▼</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <span style="font:400 13px/1 'Source Serif 4',serif;color:#bab6b6">Output</span>
+              <div style="position:relative">
+                <select style="width:100%;height:50px;padding:0 38px 0 13px;font:400 16px/1 'Source Serif 4',serif;color:#f3f2f2;background:#262423;border:1px solid #605d5d">
+                  <option>Headphones (USB-C)</option>
+                  <option>Bluetooth · Galaxy Buds</option>
+                  <option>Phone speaker</option>
+                </select>
+                <span style="position:absolute;right:13px;top:50%;transform:translateY(-50%);pointer-events:none;font:400 10px/1 'Source Serif 4',serif;color:#bab6b6">▼</span>
+              </div>
+              <span style="font:400 13px/1.35 'Source Serif 4',serif;color:#9b9797">8D needs stereo separation — headphones are strongly recommended.</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <span style="font:400 13px/1 'Source Serif 4',serif;color:#bab6b6">Processing quality</span>
+              <div style="display:flex;border:1px solid #403d3c">
+                <span style="flex:1;min-height:48px;display:flex;align-items:center;justify-content:center;font:600 15px/1 'Source Serif 4',serif;background:#0a303e;color:#99e0ff">Safe</span>
+                <span style="flex:1;min-height:48px;display:flex;align-items:center;justify-content:center;font:400 15px/1 'Source Serif 4',serif;color:#bab6b6;border-left:1px solid #403d3c">Balanced</span>
+                <span style="flex:1;min-height:48px;display:flex;align-items:center;justify-content:center;font:400 15px/1 'Source Serif 4',serif;color:#bab6b6;border-left:1px solid #403d3c">Max</span>
+              </div>
+              <span style="font:400 13px/1.35 'Source Serif 4',serif;color:#9b9797">Buffer 10 ms · CPU 4% · no dropouts in this session</span>
+            </div>
+          </div>
+
+          <div style="padding:26px 18px 0;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:15px 0;border-top:1px solid #262423">
+              <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:0">
+                <span style="font:400 16px/1.2 'Source Serif 4',serif">Start 8D when audio begins</span>
+                <span style="font:400 13px/1.3 'Source Serif 4',serif;color:#9b9797">No need to open the app</span>
+              </div>
+              <span style="flex:none;width:46px;height:26px;border-radius:13px;background:#62c5ee;position:relative"><span style="position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#0a303e"></span></span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:15px 0;border-top:1px solid #262423">
+              <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:0">
+                <span style="font:400 16px/1.2 'Source Serif 4',serif">Pause orbit when nothing plays</span>
+                <span style="font:400 13px/1.3 'Source Serif 4',serif;color:#9b9797">Saves battery between tracks</span>
+              </div>
+              <span style="flex:none;width:46px;height:26px;border-radius:13px;background:#62c5ee;position:relative"><span style="position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#0a303e"></span></span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:15px 0;border-top:1px solid #262423;border-bottom:1px solid #262423">
+              <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:0">
+                <span style="font:400 16px/1.2 'Source Serif 4',serif">Bypass all processing</span>
+                <span style="font:400 13px/1.3 'Source Serif 4',serif;color:#9b9797">A/B the effect against the original</span>
+              </div>
+              <span style="flex:none;width:46px;height:26px;border-radius:13px;background:#403d3c;position:relative"><span style="position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#9b9797"></span></span>
+            </div>
+          </div>
+
+          <div style="padding:24px 18px 24px;display:flex;flex-direction:column;gap:10px">
+            <span style="font:400 13px/1.4 'Source Serif 4',serif;color:#7d7979">8D Music 1.0 · DSP engine C++/NDK · Kotlin UI</span>
+            <button style="height:50px;width:100%;font:400 16px/1 'Source Serif 4',serif;color:#bab6b6;background:#262423;border:1px solid #403d3c;cursor:pointer" style-hover="background:#332f2f">Reset everything to defaults</button>
+          </div>
+
+          <div style="margin-top:auto;display:flex;border-top:1px solid #332f2f">
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7.2" fill="none" stroke="#9b9797" stroke-width="1.4"></circle><circle cx="9" cy="1.8" r="2.4" fill="#9b9797"></circle></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">PLAYER</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M1 12 C 5 4, 13 4, 17 12" fill="none" stroke="#9b9797" stroke-width="1.4"></path><circle cx="17" cy="12" r="2" fill="#9b9797"></circle></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">MODES</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M9 2 L11 7 L16 7 L12 10.5 L13.5 16 L9 12.8 L4.5 16 L6 10.5 L2 7 L7 7 Z" fill="none" stroke="#9b9797" stroke-width="1.3"></path></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">PRESETS</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="2" y="3.5" width="14" height="1.5" fill="#9b9797"></rect><rect x="2" y="8.2" width="14" height="1.5" fill="#9b9797"></rect><rect x="2" y="12.9" width="9" height="1.5" fill="#9b9797"></rect></svg>
+              <span style="font:400 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#9b9797">LIBRARY</span>
+            </div>
+            <div style="flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;border-top:2px solid #62c5ee;margin-top:-1px">
+              <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="3" fill="none" stroke="#62c5ee" stroke-width="1.4"></circle><circle cx="9" cy="9" r="7" fill="none" stroke="#62c5ee" stroke-width="1.4" stroke-dasharray="2.6 2.6"></circle></svg>
+              <span style="font:600 11px/1 'Source Serif 4',serif;letter-spacing:0.08em;color:#62c5ee">SETTINGS</span>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;orbitSpeed&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:0.12,&quot;min&quot;:0.02,&quot;max&quot;:0.6,&quot;step&quot;:0.01,&quot;unit&quot;:&quot; rot/s&quot;,&quot;tsType&quot;:&quot;number&quot;}}">
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.dot = React.createRef();
+    this.t1 = React.createRef();
+    this.t2 = React.createRef();
+    this.ang = React.createRef();
+    this.side = React.createRef();
+    this.a = 0;
+  }
+  componentDidMount() {
+    this.last = performance.now();
+    const speed = (this.props.orbitSpeed ?? 0.12) * 360;
+    const R = 98;
+    this.tick = (now) => {
+      const dt = Math.min(0.05, (now - this.last) / 1000);
+      this.last = now;
+      this.a = (this.a + speed * dt) % 360;
+      const put = (ref, back, op) => {
+        if (!ref.current) return;
+        const r = (this.a - back) * Math.PI / 180;
+        ref.current.style.transform = 'translate(' + (Math.sin(r) * R).toFixed(1) + 'px,' + (-Math.cos(r) * R).toFixed(1) + 'px)';
+        ref.current.style.opacity = op;
+      };
+      put(this.dot, 0, 1);
+      put(this.t1, 14, 0.45);
+      put(this.t2, 28, 0.3);
+      const norm = ((this.a % 360) + 540) % 360 - 180;
+      if (this.ang.current) this.ang.current.textContent = (norm >= 0 ? '+' : '') + Math.round(norm) + '°';
+      const pan = Math.sin(this.a * Math.PI / 180) * 0.85;
+      if (this.side.current) this.side.current.textContent = pan < -0.15 ? 'left' : pan > 0.15 ? 'right' : 'centre';
+      this.raf = requestAnimationFrame(this.tick);
+    };
+    this.raf = requestAnimationFrame(this.tick);
+  }
+  componentWillUnmount() { cancelAnimationFrame(this.raf); }
+  renderVals() {
+    return { dot: this.dot, t1: this.t1, t2: this.t2, ang: this.ang, side: this.side };
+  }
+}
+</script>
+</body>
+</html>

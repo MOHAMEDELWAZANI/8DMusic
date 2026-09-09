@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Direct capture records the audio other apps are playing, so the OS
+         treats it as recording even though no microphone is involved. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <!-- Declared so Shizuku can grant it; the system never gives it to an
+         ordinary app, which is exactly why system-wide mode needs Shizuku. -->
+    <uses-permission android:name="android.permission.DUMP"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+
+    <application
+        android:allowBackup="true"
+        android:largeHeap="true"
+        android:label="8D Music"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.EightD">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            android:label="8D Music">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Keeps the engine alive while the user is in the app they are
+             actually listening to. -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:enabled="true"
+            android:exported="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <!-- Not a real listener: notification access is how Android gates
+             reading other apps' media metadata. -->
+        <service
+            android:name=".audio.MediaListener"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".audio.CaptureService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
+    </application>
+</manifest>

@@ -11,6 +11,20 @@ cpp/tests/engine_probe_bin
 *.o
 *.d
 
+# android build
+android/.gradle/
+android/build/
+android/app/build/
+android/app/.cxx/
+android/local.properties
+android/.idea/
+# the bundled test track is a real song -- kept out of the repo
+android/app/src/main/assets/*.mp3
+
+# windows build
+windows/build/
+windows/out/
+
 # editors / local
 .idea/
 .claude/

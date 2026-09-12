@@ -1,13 +1,32 @@
 // COM plumbing: what Windows needs in order to find and load the effect.
 #include "EightDApo.h"
+
+// DEFINE_GUID in the header only *declares* the symbol. Exactly one
+// translation unit has to define it. Doing it by hand rather than via
+// <initguid.h> is deliberate: initguid instantiates every DEFINE_GUID in every
+// header pulled in after it, including the APO ones, which then collide with
+// the copies already in uuid.lib.
+EXTERN_C const GUID CLSID_EightDApoMFX =
+    { 0x7f9e2c10, 0x4e2b, 0x4c77, { 0x9e, 0x3e, 0x8d, 0x0c, 0x1b, 0x5a, 0x6d, 0x01 } };
 #include <new>
 #include <cstdio>
 
 namespace {
-
 std::atomic<LONG> g_objects{0};
 std::atomic<LONG> g_locks{0};
 HMODULE g_module = nullptr;
+} // namespace
+
+// The live-object count has to be kept by the object itself, not by the class
+// factory: CreateInstance is not the only thing that ends up holding one, and
+// counting there leaked the count permanently, so DllCanUnloadNow could never
+// return S_OK and the DLL could never be unloaded.
+namespace eightd {
+void moduleAddRef()  { ++g_objects; }
+void moduleRelease() { --g_objects; }
+}
+
+namespace {
 
 class ClassFactory final : public IClassFactory {
 public:
@@ -29,12 +48,19 @@ public:
     }
 
     STDMETHODIMP CreateInstance(IUnknown* outer, REFIID riid, void** ppv) override {
-        if (outer) return CLASS_E_NOAGGREGATION;
-        auto* apo = new (std::nothrow) eightd::EightDApo();
+        if (!ppv) return E_POINTER;
+        *ppv = nullptr;
+
+        // The audio engine AGGREGATES system-effect APOs -- non-null controlling
+        // unknown, IID_IUnknown requested. Returning CLASS_E_NOAGGREGATION here
+        // makes the engine skip the effect without reporting anything at all,
+        // anywhere. That one line is why nothing ever loaded.
+        if (outer && riid != __uuidof(IUnknown)) return E_NOINTERFACE;
+
+        auto* apo = new (std::nothrow) eightd::EightDApo(outer);
         if (!apo) return E_OUTOFMEMORY;
-        ++g_objects;
-        const HRESULT hr = apo->QueryInterface(riid, ppv);
-        apo->Release();
+        const HRESULT hr = apo->nonDelegating()->QueryInterface(riid, ppv);
+        apo->nonDelegating()->Release();
         return hr;
     }
 

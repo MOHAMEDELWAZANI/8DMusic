@@ -1,0 +1,55 @@
+﻿8D MUSIC - PLEASE READ BEFORE INSTALLING
+
+8D Music makes sound seem to move around your head, on everything your computer
+plays - Spotify, YouTube, games, films. Use headphones; the effect is built on
+the difference between what your left and right ear hear.
+
+Three things you should know first.
+
+
+1. THIS NEEDS ADMINISTRATOR ACCESS.
+
+   The effect installs into Windows' own audio system, and Windows will not let
+   an ordinary program do that.
+
+
+2. YOU WILL NEED TO RESTART YOUR COMPUTER.
+
+   Windows only picks up a new audio effect properly after a restart. Setup
+   will offer to restart for you when it finishes.
+
+
+3. IT CHANGES A WINDOWS SECURITY SETTING.
+
+   This is the important one.
+
+   Windows normally refuses to load audio effects unless Microsoft has signed
+   them. 8D Music is not signed, so Setup switches that check off. The setting
+   is called DisableProtectedAudioDG.
+
+   What that means for you:
+
+     - It applies to the whole computer, not only to 8D Music. Any other
+       unsigned audio effect could load too.
+
+     - Some copy-protected music and video - certain streaming services, some
+       DVD and Blu-ray players - may refuse to play, or play without sound,
+       while it is off. That is the protected content noticing the check is
+       disabled. Nothing is damaged, and it stops when you uninstall.
+
+   Uninstalling puts the setting back exactly as it was found. If some other
+   audio software had already turned it off before you installed 8D Music, the
+   uninstaller leaves it off rather than breaking that software.
+
+   If you are not comfortable with this, close Setup now. Nothing here is
+   hidden from you, and that is deliberate.
+
+
+WHAT ELSE IT DOES
+
+   It does not change your output device. Whatever you had selected stays
+   selected.
+
+   It records every setting it changes in
+       C:\ProgramData\8DMusic\install-backup.ini
+   and the uninstaller restores from that file.

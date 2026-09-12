@@ -28,3 +28,11 @@ windows/out/
 # editors / local
 .idea/
 .claude/
+
+# parity probe working dir
+.parity/
+
+# the built Windows package (binaries; rebuild with windows/CMakeLists.txt)
+dist/8DMusic/*.exe
+dist/8DMusic/*.dll
+dist/*.zip

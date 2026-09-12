@@ -1,9 +1,28 @@
 // The channel between the control window and the DSP.
 //
 // The APO does not run in our process -- Windows loads it into audiodg.exe --
-// so parameters cannot simply be a pointer.  This is a named shared block:
-// the GUI writes settings, the APO writes back what the orbit is doing, and
-// neither side ever blocks the other.
+// so parameters cannot simply be a pointer.
+//
+// WHY THIS IS A FILE AND NOT A `Global\` NAMED MAPPING
+//
+// Measured on the development machine, not assumed:
+//
+//   * audiodg.exe runs in session 0.  The control window runs in the user's
+//     interactive session (session 8 on that box).  A `Local\` name is
+//     per-session, so it can never reach audiodg -- the name has to be global.
+//   * Creating anything in the `Global\` namespace requires
+//     SeCreateGlobalPrivilege.  `whoami /priv` for a normal interactive user
+//     does not list it.  A non-elevated 8DMusic.exe therefore *cannot* create
+//     a `Global\` mapping at all; CreateFileMapping fails with
+//     ERROR_ACCESS_DENIED.
+//
+// So the block is backed by a real file instead.  Two processes mapping the
+// same file share the same pages, with no kernel namespace involved and no
+// privilege required.  The installer creates the file once, with a DACL that
+// lets audiodg's restricted token in.
+//
+// It also buys something the named mapping never had: settings survive a
+// reboot, and survive audiodg being restarted, because they live on disk.
 #pragma once
 #include <windows.h>
 #include <cstdint>
@@ -11,11 +30,12 @@
 
 namespace eightd {
 
-// Global\ so the GUI (user session) and audiodg (service session) see the same
-// object.  Both names are versioned: a stale block from an older build must not
-// be mistaken for this one.
-inline constexpr wchar_t kSharedName[] = L"Global\\8DMusicState_v1";
-inline constexpr uint32_t kMagic = 0x38444D31;   // "8DM1"
+// Versioned: a block left by an older build must not be read as this one.
+inline constexpr uint32_t kMagic   = 0x38444D32;   // "8DM2"
+inline constexpr uint32_t kVersion = 2;
+
+// %ProgramData%\8DMusic\state.bin -- resolved at runtime, never hardcoded to C:.
+const wchar_t* sharedStatePath();
 
 // Written by the GUI, read by the audio thread.  Torn reads are prevented with
 // a seqlock rather than a mutex: the audio thread must never wait on a UI
@@ -40,6 +60,12 @@ struct SharedState {
     volatile LONG heartbeat;
     uint32_t sampleRate;
     uint32_t channels;
+
+    // Set by the APO when it had to refuse the endpoint's format, so the GUI
+    // can say *why* nothing is happening instead of showing a bare WAITING.
+    volatile LONG formatRejected;   // 0 = fine, 1 = refused
+    uint32_t rejectedChannels;
+    uint32_t rejectedBits;
 };
 
 /** Writer side: publish a settings change. */
@@ -81,11 +107,14 @@ inline void writeTelemetry(SharedState* s, float angle, float distance,
 }
 
 /**
- * Opens (or creates) the block.
+ * Opens the block, creating the backing file if `create` is set.
  *
- * audiodg runs at a different integrity level to the desktop, so the mapping
- * needs a DACL that lets it in; without one the APO silently sees nothing and
- * the effect appears dead.
+ * Reference counted: several APO instances live in one audiodg (one per
+ * endpoint), and the first one to be destroyed must not unmap the view the
+ * others are still reading.
+ *
+ * The view is locked into memory by the caller in the APO, so the realtime
+ * thread can never take a page fault on it.
  */
 SharedState* openSharedState(bool create);
 void closeSharedState();

@@ -27,20 +27,47 @@ DEFINE_GUID(CLSID_EightDApoMFX,
 
 namespace eightd {
 
+// WHY THIS IS AGGREGATED, AND WHY IT IMPLEMENTS IAudioSystemEffects3
+//
+// Both were found the hard way, by instrumenting a probe until the audio engine
+// showed its hand.  The engine creates a system-effect APO by *aggregation*: it
+// calls IClassFactory::CreateInstance with a non-null controlling unknown and
+// asks for IID_IUnknown.  A factory that answers CLASS_E_NOAGGREGATION -- the
+// reflexive thing to write -- is skipped in total silence: no error, no event
+// log entry, the CLSID absent from an ETW trace.  It looks exactly like Windows
+// refusing third-party APOs, and it is not.
+//
+// It then queries IAudioSystemEffects3 (Windows 11) and, with ThreadingModel
+// "Both", expects the object to have no apartment affinity -- so the free-
+// threaded marshaler is aggregated and IAgileObject is answered.
 class EightDApo final
     : public IAudioProcessingObject
     , public IAudioProcessingObjectConfiguration
     , public IAudioProcessingObjectRT
-    , public IAudioSystemEffects
+    // 3 derives from 2 derives from 1, so this covers all three.
+    , public IAudioSystemEffects3
 {
 public:
-    EightDApo();
+    explicit EightDApo(IUnknown* outer);
     virtual ~EightDApo();
 
-    // IUnknown
+    // The non-delegating IUnknown, handed to whoever aggregates us.
+    IUnknown* nonDelegating() { return &inner_; }
+
+    // IUnknown -- delegating: everything the aggregate exposes must forward to
+    // the controlling unknown or refcounts and QI identity break.
     STDMETHODIMP QueryInterface(REFIID riid, void** ppv) override;
     STDMETHODIMP_(ULONG) AddRef() override;
     STDMETHODIMP_(ULONG) Release() override;
+
+    // IAudioSystemEffects2 / 3
+    STDMETHODIMP GetEffectsList(LPGUID* ppEffectsIds, UINT* pcEffects,
+                                HANDLE Event) override;
+    STDMETHODIMP GetControllableSystemEffectsList(AUDIO_SYSTEMEFFECT** effects,
+                                                  UINT* numEffects,
+                                                  HANDLE event) override;
+    STDMETHODIMP SetAudioSystemEffectState(GUID effectId,
+                                           AUDIO_SYSTEMEFFECT_STATE state) override;
 
     // IAudioProcessingObject
     STDMETHODIMP Reset() override;
@@ -71,7 +98,32 @@ public:
     STDMETHODIMP_(UINT32) CalcOutputFrames(UINT32 u32InputFrameCount) override;
 
 private:
-    std::atomic<ULONG> ref_{1};
+    void passthrough(APO_CONNECTION_PROPERTY* in, APO_CONNECTION_PROPERTY* out);
+
+    // Non-delegating IUnknown: the only thing that actually owns the object.
+    class Inner final : public IUnknown {
+    public:
+        explicit Inner(EightDApo* owner) : owner_(owner) {}
+        STDMETHODIMP QueryInterface(REFIID riid, void** ppv) override {
+            return owner_->innerQueryInterface(riid, ppv);
+        }
+        STDMETHODIMP_(ULONG) AddRef() override { return ++ref_; }
+        STDMETHODIMP_(ULONG) Release() override {
+            const ULONG n = --ref_;
+            if (n == 0) delete owner_;      // Inner lives inside owner_
+            return n;
+        }
+    private:
+        EightDApo* owner_;
+        std::atomic<ULONG> ref_{1};
+    };
+    friend class Inner;
+
+    HRESULT innerQueryInterface(REFIID riid, void** ppv);
+
+    Inner      inner_;
+    IUnknown*  outer_;
+    IUnknown*  ftm_ = nullptr;
 
     Processor processor_;
     Params    params_{};             // last good snapshot

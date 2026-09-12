@@ -1,5 +1,8 @@
-// Runs the C++ chain over a deterministic signal and dumps raw f32 for the
-// Python side to compare against.
+// Runs the chain over a deterministic signal and dumps raw f32.
+//
+// Every platform renders this same probe; compare_f32.py compares two sets of
+// dumps.  It is how "the builds produce identical audio" stays a measurement
+// rather than a claim.
 #include "../src/dsp/Processor.h"
 #include <cstdio>
 #include <cstdlib>

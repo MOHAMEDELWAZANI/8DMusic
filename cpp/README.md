@@ -9,9 +9,12 @@
 
 <h1 align="center">8D Music — C++ build</h1>
 
-Real-time 8D spatial audio for **everything your computer plays**, rewritten in
-C++. Same effect as the Python build, same presets, same numbers on the dials —
-but the audio path is native and the interface repaints only what moves.
+Real-time 8D spatial audio for **everything your computer plays**. The audio
+path is native, the DSP runs inside PipeWire's realtime callback, and the
+interface repaints only what moves.
+
+The effect itself lives in [`src/dsp/`](src/dsp/) and is compiled in place by the
+Windows and Android builds too — see the [parity table](../BENCHMARK.md).
 
 ## Run it
 
@@ -35,40 +38,24 @@ Then pick your **output device**, press **Start**, and play something.
 ./8dmusic --check     # verify the system and list outputs
 ```
 
-The reference build lives in [`../python`](../python/); the full comparison
-and how it was measured are in [`../BENCHMARK.md`](../BENCHMARK.md).
-
-## What changed from the Python build
-
-The effect is identical — that was checked numerically, not by ear (see
-*Verification*). Everything that changed is in how the audio gets there.
-
-| | Python | C++ |
-| --- | --- | --- |
-| Audio path | virtual sink + `pw-record` and `pw-play` **subprocesses** piped through the kernel | two native `pw_stream`s in this process |
-| DSP | NumPy, per-block array allocation | in the realtime callback, zero allocation |
-| Device list | `pw-dump` **subprocess** every 2 s, ~1 MB of JSON parsed each time | PipeWire registry, event-driven, no polling |
-| Routing | `pw-metadata` subprocess per call | metadata proxy, in process |
-| Now Playing | `busctl` **subprocess** per poll | sd-bus, spoken directly |
-| Text | Tk, one face per string | Pango: shaping, bidi and font fallback |
-| Interface | Tk, full-window repaint | cairo, only the orbit strip repaints |
-| Helper processes while running | 4 | **0** |
+Full method and figures are in [`../BENCHMARK.md`](../BENCHMARK.md).
 
 ### Measured
 
-| | Python | C++ |
-| --- | --- | --- |
-| Memory (idle) | 124 MB | **38 MB** |
-| Memory (running) | — | **43 MB** |
-| DSP cost | 13–28 % of realtime | **0.4–1.1 %** |
-| CPU, running with the UI open | — | **10 % of one core** |
-| CPU, idle with the window open | — | **0 %** (it draws no frames) |
-| Frame cost | — | 3.1 ms at 31 fps |
-| Pointer crossing controls | — | one 10 ms repaint per control entered |
-| Binary / install | ~223 MB `.venv` | **443 KB** |
+| | |
+| --- | ---: |
+| Memory, idle | **38 MB** |
+| Memory, running | **43 MB** |
+| DSP cost | **0.4–1.1 %** of realtime |
+| CPU, running with the UI open | **10 % of one core** |
+| CPU, idle with the window open | **0 %** — it draws no frames |
+| Frame cost | 3.1 ms at 31 fps |
+| Pointer crossing controls | one 10 ms repaint per control entered |
+| Binary | **448 KB** |
 
-The DSP speed-up measured **25–44×** depending on mode and how busy the
-machine was; the ratio within any single run held between 25× and 31×.
+There are no helper processes. Audio never leaves this address space: two native
+`pw_stream`s, the device list from the PipeWire registry rather than polling, and
+MPRIS read directly over sd-bus.
 
 ## How it works
 
@@ -127,11 +114,10 @@ band-limited, saturated, with tape wow and gated hiss).
 
 ## Verification
 
-- **The effect is unchanged.** The same signal was pushed through both builds:
-  correlation **1.0000** on all seven movement modes, largest sample difference
-  0.0006, identical RMS. `slowed` matches at 0.9889 (a pitch shifter drifts in
-  phase); `radio` at 0.8767 because its hiss is random in both — its level
-  matches to 0.999.
+- **The effect is the same everywhere.** `tests/dsp_probe.cpp` renders a
+  deterministic signal through every movement mode; the Windows and Android
+  builds render the identical probe and agree to correlation **1.000000**,
+  largest sample difference **0.000006**.
 - **Audio really flows.** Driven end to end on an isolated sink: the stereo
   balance sweeps the full −1.00…+1.00, 420 blocks, **zero underruns**.
 - **Routing is restored.** Start takes over the default sink, Stop puts it back
@@ -142,8 +128,8 @@ band-limited, saturated, with tape wow and gated hiss).
   pixels against the theme's accent colour, not by eye — and hover highlighting
   updates as the pointer crosses controls.
 - **Now Playing reads the real bus.** Live titles, position, transport
-  capabilities and the cover mark, checked against the Python build: 16/16
-  titles and 6/6 cover marks identical, Arabic and Japanese among them.
+  capabilities and the cover mark, checked case by case across 16 titles and 6
+  cover marks, Arabic and Japanese among them.
 - **Text truncation stays valid UTF-8** at every width across Arabic, Japanese
   and accented Latin — a string cut through a character puts cairo into a
   permanent error state and silently discards the rest of the frame.
@@ -153,12 +139,11 @@ band-limited, saturated, with tape wow and gated hiss).
 The head of the rail shows what is actually playing: cover mark, title, artist,
 elapsed and total time, a progress bar, and working previous / play-pause / next
 buttons. It comes from MPRIS on the session bus, read through **sd-bus** on a
-background thread — the Python build ran `busctl` once a second instead.
+background thread.
 
-Titles are tidied the same way: uploader suffixes (`- Topic`, `VEVO`) dropped,
+Titles are tidied on the way in: uploader suffixes (`- Topic`, `VEVO`) dropped,
 `(Official Video)` and its relatives removed, `ft. …` moved out of the title and
-into the performers. That was checked case by case against the Python cleaner —
-16 of 16 identical, Arabic included.
+into the performers.
 
 Text is drawn with **Pango**, so scripts that need shaping and reordering get
 them: an Arabic title joins up and reads right to left, and a face that lacks a
@@ -173,8 +158,8 @@ src/
   audio/     Graph (registry + metadata), Engine (the two streams, ring, routing),
              NowPlaying (MPRIS over sd-bus)
   ui/        Window (X11 + cairo), Widgets (immediate mode), App, Theme, Config
-tests/       dsp_probe (cross-check against Python), engine_probe (headless audio),
-             nowplaying_probe (what the session bus reports)
+tests/       dsp_probe (the shared parity probe), compare_f32.py,
+             engine_probe (headless audio), nowplaying_probe (the session bus)
 ```
 
 Settings live in `~/.config/8dmusic-cpp/settings.conf`.

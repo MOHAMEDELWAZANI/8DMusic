@@ -1,0 +1,13 @@
+#include "resource.h"
+
+// The application icon. Windows picks the size it needs out of the .ico, so
+// this is what shows in the title bar, the taskbar, Alt+Tab and Explorer --
+// built from python/eight_d/assets/icon-*.png so every build wears the same
+// mark. It must be the lowest-numbered icon in the file: that is the one
+// Explorer uses for the executable.
+IDI_APPICON ICON "8dmusic.ico"
+
+// The wordmark lockup for the top bar, one per theme. Stored as PNG and handed
+// straight to GDI+, so the alpha edges stay clean at any DPI.
+IDR_LOGO_DARK  RCDATA "logo-dark.png"
+IDR_LOGO_LIGHT RCDATA "logo-light.png"

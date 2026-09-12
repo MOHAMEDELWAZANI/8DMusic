@@ -84,8 +84,8 @@ struct Params {
 
 struct Preset { const char* name; Params p; };
 
-// Built from the defaults, then overridden -- same values as the Python build,
-// so the two versions sound identical.
+// Built from the defaults, then overridden.  These values are mirrored by the
+// Windows and Android builds, so a preset means the same thing everywhere.
 inline Params preset(Mode m, float speed, float radius, float depth, float smooth,
                      float width, float dMix, float dTime, float dFb,
                      float rMix, float rSize, float rDamp,

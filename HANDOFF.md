@@ -13,7 +13,6 @@ files in place; nobody copies them.
 | `cpp/` | direct |
 | `android/` | `CMakeLists.txt` → `../../../../../cpp/src/dsp` |
 | `windows/` | `CMakeLists.txt` → `../cpp/src/dsp` |
-| `python/` | separate reference implementation, kept in step by measurement |
 
 Both native build files **hard-fail** if they cannot find the DSP. Keep it that
 way: the moment one platform gets its own copy, "identical across builds" stops
@@ -35,8 +34,8 @@ correlation 1.000000 across all eight modes
 largest sample difference 0.000006
 ```
 
-For comparison, Python vs C++ is 0.0006 — a hundred times looser, because those
-are two implementations rather than one source file compiled twice.
+That is one source file compiled twice, not two implementations agreeing — which
+is why it lands three orders of magnitude tighter than a reimplementation would.
 
 Do this again for Windows once it builds. It is the only honest way to claim the
 three builds sound the same.

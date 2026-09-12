@@ -1,9 +1,9 @@
 // Working out what the user is actually listening to.
 //
 // Players publish title, artist, length and position on the session bus over
-// MPRIS, and hand us working transport controls with them.  The Python build
-// reached the bus by running `busctl` once a second; here we speak D-Bus
-// directly through sd-bus, so nothing is forked.
+// MPRIS, and hand us working transport controls with them.  We speak D-Bus
+// directly through sd-bus rather than forking `busctl`, so nothing is spawned
+// once a second just to ask what is playing.
 //
 // All of it runs on its own thread -- a bus round trip in the middle of a 33 ms
 // frame would be a visible stutter -- and the interface only ever reads the

@@ -3,14 +3,15 @@
 </p>
 
 <p align="center">
-  <img alt="platform: Linux + PipeWire" src="https://img.shields.io/badge/platform-Linux%20%2B%20PipeWire-0E7FA8">
-  <img alt="Python build" src="https://img.shields.io/badge/python-3.9%2B-3776AB">
-  <img alt="C++ build" src="https://img.shields.io/badge/C%2B%2B-20-00599C">
+  <img alt="Linux + PipeWire" src="https://img.shields.io/badge/Linux-PipeWire-0E7FA8">
+  <img alt="Windows APO" src="https://img.shields.io/badge/Windows-native%20APO-0078D4">
+  <img alt="Android" src="https://img.shields.io/badge/Android-10%2B-3DDC84">
+  <img alt="C++20" src="https://img.shields.io/badge/C%2B%2B-20-00599C">
   <img alt="effect: identical across builds" src="https://img.shields.io/badge/effect-identical%20across%20builds-1C9E63">
 </p>
 
 <p align="center">
-  <b>Real-time 8D spatial audio for everything your computer plays.</b><br>
+  <b>Real-time 8D spatial audio for everything your device plays.</b><br>
   No uploading, no converting, no per-file processing — YouTube, Spotify, games,
   movies, Discord and anything else are spatialised live on their way to your
   headphones.
@@ -18,38 +19,35 @@
 
 ---
 
-## Two builds, one effect
+## One effect, three platforms
 
-The same tool exists twice. The **Python** build came first and is the reference
-implementation; the **C++** build is a rewrite that keeps the effect bit-for-bit
-and rebuilds everything around it.
+The effect exists exactly once, in [`cpp/src/dsp/`](cpp/src/dsp/). Linux, Windows
+and Android each compile those same files **in place** — nobody keeps a copy.
+Both native build files fail loudly if the shared DSP is missing, because the
+moment one platform forks the effect, "identical everywhere" becomes a claim
+nobody can check.
 
-They are not two different products. Pushed the same audio, they agree to a
-correlation of **1.0000**, with a largest sample difference of 0.0006 — so the
-choice between them is a choice about cost, not about sound.
+That claim is measured rather than asserted. Each platform renders the same
+deterministic probe — 220 Hz, five seconds, all eight movement modes — and the
+raw output is compared sample by sample against the Linux build:
 
-| | [Python](python/) | [C++](cpp/) |
-| --- | --- | --- |
-| Install | `.venv` with NumPy + SciPy, **271 MB** | one **443 KB** binary |
-| Needs a compiler | no | yes, once |
-| Interface | Tk, hand-drawn | cairo + Pango on X11 |
-| Audio path | virtual sink → `pw-record` → pipe → DSP → pipe → `pw-play` | two native `pw_stream`s, in process |
-| Helper processes while running | 4 | **0** |
-| CPU, audio path | 23.6 % of a core | **2.6 %** |
-| CPU, window open and idle | 20.5 % | **0.5 %** |
-| Memory | 121–135 MB | **37–43 MB** |
-| Arabic text | shaped and reordered by hand in `bidi.py` | Pango, plus fallback for any script |
+| | [Linux](cpp/) | [Windows](windows/) | [Android](android/) |
+| --- | --- | --- | --- |
+| Correlation | reference | **1.000000** | **1.000000** |
+| Largest sample difference | — | **0.000006** | **0.000006** |
+| Reaches system audio via | PipeWire virtual sink | native APO in `audiodg` | playback capture + Shizuku |
+| Interface | cairo + Pango on X11 | Win32 + GDI | Kotlin + Compose |
+| Install | one 448 KB binary | installer, one reboot | 30 MB APK |
+| Needs admin / root | no | admin once | no root |
 
-**Which should you run?** The C++ build, if you can spend one `apt install` and
-17 seconds compiling — it costs about a tenth as much and starts in a tenth the
-time. The Python build if you want to read or change the code quickly, or if a
-compiler is not available. Neither is a downgrade in sound.
+Same source, two compilers, three operating systems, three CPU architectures —
+and the audio still matches to six decimal places.
 
 <p align="center">
   <img src="docs/cpp-dark.png" width="900"
-       alt="The C++ build in dark mode: the orbit visualiser fills the left of the window with the source mid-lap, and the right rail carries the now playing panel above the movement controls">
+       alt="The Linux build in dark mode: the orbit visualiser fills the left of the window with the source mid-lap, and the right rail carries the now playing panel above the movement controls">
 </p>
-<p align="center"><sub>The C++ build. The rail scrolls — a taller window shows the rest of it.</sub></p>
+<p align="center"><sub>The Linux build. The rail scrolls — a taller window shows the rest of it.</sub></p>
 
 ## Quick start
 
@@ -58,7 +56,7 @@ git clone git@github.com:MOHAMEDELWAZANI/8DMusic.git
 cd 8DMusic
 ```
 
-**C++**
+**Linux** — nothing to configure, no reboot, no admin.
 
 ```bash
 sudo apt install build-essential pkg-config libpipewire-0.3-dev \
@@ -66,34 +64,75 @@ sudo apt install build-essential pkg-config libpipewire-0.3-dev \
 cd cpp && make && ./8dmusic
 ```
 
-**Python**
+Pick your **output device**, press **Start**, play something. Press **Stop**, or
+close the window, and your audio goes back to normal. `--check` verifies the
+system and lists outputs.
+
+**Windows** — Visual Studio 2022 with the Desktop C++ workload.
+
+```
+cd windows
+cmake -B build -A x64
+cmake --build build --config Release
+```
+
+Then run the installer in [`windows/installer/`](windows/installer/). It needs
+administrator rights once and a restart, after which the effect is in the audio
+path permanently and `8DMusic.exe` only controls it. Your selected output device
+stays selected — nothing is rerouted and no virtual cable is involved.
+
+**Android** — Android Studio, or:
 
 ```bash
-cd python && ./run.sh          # first run builds .venv, then it starts at once
+cd android && ./gradlew :app:assembleDebug
 ```
 
-Either way: pick your **output device**, press **Start**, and play something.
-Press **Stop**, or close the window, and your audio goes back to normal. Both
-builds accept `--check` to verify the system and list outputs.
+## How each one reaches the audio
 
-## How it works
+The effect is the same everywhere. Getting *to* the audio is the part each
+operating system decides for you, and all three answers are different.
 
-The app inserts a virtual output device into the audio graph and makes it the
-system default, so every application ends up playing into it:
+**Linux** inserts a virtual output device into the PipeWire graph and makes it
+the system default, so every application ends up playing into it:
 
 ```
-  apps ──▶ [ 8D Music virtual sink ] ──▶ DSP ──▶ your speakers
+  apps ──▶ [ 8D Music virtual sink ] ──▶ DSP ──▶ your headphones
 ```
 
-Because the effect sits at the very end of the chain, it applies to all sound at
-once and needs no cooperation from the apps producing it. The virtual sink
-belongs to the running process: if the app is killed — even with `SIGKILL` —
-PipeWire tears the sink down and your previous default device comes back.
+The sink belongs to the running process: kill the app — even with `SIGKILL` —
+and PipeWire tears the sink down and your previous default comes back.
 
-The two builds differ only in how the audio gets from that sink to the DSP and
-back out. Python carries it through `pw-record` and `pw-play` subprocesses and
-kernel pipes; C++ runs both ends as native `pw_stream`s in one process, with the
-DSP inside PipeWire's realtime callback.
+**Windows** puts the DSP inside the audio engine itself, as an Audio Processing
+Object that Windows loads into `audiodg.exe`:
+
+```
+  apps ──▶ Windows audio engine ──▶ [ 8D Music APO ] ──▶ your headphones
+```
+
+Nothing is rerouted, so the user's chosen output device stays chosen. The
+control window is a separate process and talks to the APO through shared memory,
+which is why closing the window cannot interrupt playback.
+
+Getting an APO to load at all took considerable work; the full recipe — five
+things that must *all* be true, or Windows skips the effect in complete silence
+with no error anywhere — is written up in
+[`windows/docs/APO-RESEARCH.md`](windows/docs/APO-RESEARCH.md).
+
+**Android** has no equivalent of either, and offers three routes with different
+costs, so the app asks which you want:
+
+| Route | Setup | Reaches |
+| --- | --- | --- |
+| Local player | none | your own files |
+| Direct capture | none | apps that permit playback capture |
+| System-wide | Shizuku, once | everything, including apps that block capture |
+
+System-wide works by capturing playback and *silencing the original stream* —
+otherwise you hear the dry and spatialised versions at once, which for an effect
+built on a sub-millisecond delay between the ears destroys exactly what it is
+doing. Silencing needs other apps' audio session ids, which Android will not
+give an ordinary app, so Shizuku grants `android.permission.DUMP` **once**. It
+survives reboots and app updates; Shizuku is never needed again afterwards.
 
 ## The effect
 
@@ -123,7 +162,7 @@ Extreme Spin · Deep Space · Figure Eight · Slowed & Sad · Old Radio
 
 **Controls** — movement speed, orbit radius, effect depth, smoothness, manual
 position, stereo width, delay (mix / time / feedback), reverb (mix / room size /
-damping), output volume, bypass, reset to defaults.
+damping), three-band tone, output volume, bypass, reset to defaults.
 
 | Key | Action |
 | --- | --- |
@@ -134,10 +173,17 @@ damping), output volume, bypass, reset to defaults.
 
 ## Now playing
 
-Both builds show what you are actually listening to — title, artists, elapsed
+Every build shows what you are actually listening to — title, artists, elapsed
 time — with skip and play/pause that drive the player itself, not the effect.
-It reads MPRIS from the session bus, so Spotify, Firefox, Chrome/Brave, VLC, mpv
-and Rhythmbox all work with nothing to configure. Nothing leaves the machine.
+Each platform has its own source for this, and the same panel on top:
+
+| | Reads from |
+| --- | --- |
+| Linux | MPRIS over the session bus |
+| Windows | `GlobalSystemMediaTransportControlsSessionManager` |
+| Android | `MediaSessionManager` |
+
+Nothing leaves the machine.
 
 <p align="center">
   <img src="docs/now-playing-dark.png" width="840"
@@ -150,61 +196,74 @@ channel becomes **Love The Way You Lie** by **Eminem · Rihanna**. The cover is 
 lettered tile — two artists give their initials, one artist gives its opening
 pair.
 
-Arabic needs shaping and reordering before it can be drawn. The Python build
-does both by hand in [`bidi.py`](python/eight_d/bidi.py), reading the contextual
-letter forms out of `unicodedata`; the C++ build hands the problem to Pango,
-which also covers every other script and falls back when a face lacks a glyph.
+Arabic needs shaping and reordering before it can be drawn; the Linux build
+hands that to Pango, which also covers every other script and falls back when a
+face lacks a glyph.
+
+One limit worth stating plainly: only apps that publish a media session appear.
+Spotify does, and Chromium browsers report whatever a page declares. Discord and
+most games do not — they will read as *nothing playing* while plainly audible.
+That is the API's boundary, not a bug.
 
 ## Measured
 
-Full method, spreads and caveats in **[BENCHMARK.md](BENCHMARK.md)** — runs are
-interleaved and reported as medians, on a machine that was explicitly not quiet.
-
-| | Python | C++ | |
-| --- | ---: | ---: | ---: |
-| DSP, share of real time | 12.8–15.7 % | 0.43–0.67 % | **29× faster** |
-| Whole audio path, CPU | 23.6 % | 2.6 % | 9.0× less |
-| Latency added by the effect | 21.7 ms | ~3.5 ms | ~18 ms less |
-| Time to window | 1601 ms | 91 ms | 17.6× faster |
-| CPU idle, window open | 20.5 % | 0.5 % | 41× less |
-| Install size | 271 MB | 443 KB | |
-
-Most of that is architecture rather than language: no helper processes, no
-`pw-dump` polling, and an interface that draws only when something changed. The
-DSP is the one place where the language itself dominates.
+The parity probe is the project's own check that the builds agree, and it runs
+on each platform:
 
 ```bash
-cd cpp/bench
-REPS=5 python3 dsp_bench.py      # the effect itself
-REPS=3 python3 audio_bench.py    # the whole audio path
-REPS=5 python3 latency_bench.py  # delay added by the effect
-REPS=3 python3 gui_bench.py      # the interface
+# Linux — build the reference and render every mode
+g++ -std=c++20 -O3 -ffast-math -fno-math-errno \
+    -o dsp_probe cpp/tests/dsp_probe.cpp cpp/src/dsp/Processor.cpp -Icpp/src/dsp
+
+# compare any two sets of dumps
+python3 cpp/tests/compare_f32.py REFERENCE_DIR CANDIDATE_DIR
 ```
+
+Windows has [`windows/parity.ps1`](windows/parity.ps1); Android runs the same
+probe from the app and the output is pulled with `adb`.
+
+Compiler flags are matched deliberately — `-O3 -ffast-math -fno-math-errno` on
+GCC and Clang, `/O2 /fp:fast` on MSVC — because parity to six decimal places is
+only meaningful if the arithmetic is allowed to be the same.
+
+Performance and method for the Linux build are in
+**[BENCHMARK.md](BENCHMARK.md)**.
 
 ## Layout
 
 ```
 8DMusic/
 ├── README.md            this file
-├── BENCHMARK.md         how the two builds compare, and how that was measured
+├── BENCHMARK.md         how the effect performs, and how that was measured
+├── HANDOFF.md           where each build stands, for picking the work back up
 ├── assets/              cover and logo lockups
 ├── docs/                screenshots, and the UI exports under docs/design/
-├── python/              the reference build — see python/README.md
-│   ├── eight_d/         dsp, engine, pipewire, ui, nowplaying, bidi
-│   └── run.sh
-└── cpp/                 the rewrite — see cpp/README.md
-    ├── src/dsp/         the effect, allocation-free
-    ├── src/audio/       PipeWire graph, engine, MPRIS over sd-bus
-    ├── src/ui/          X11 + cairo + Pango
-    └── bench/           the benchmark harness
+│
+├── cpp/                 Linux — see cpp/README.md
+│   ├── src/dsp/         THE EFFECT. shared by all three builds
+│   ├── src/audio/       PipeWire graph, engine, MPRIS over sd-bus
+│   ├── src/ui/          X11 + cairo + Pango
+│   └── tests/           the parity probe and its comparison script
+│
+├── windows/             Windows — see windows/README.md
+│   ├── src/apo/         the APO Windows loads into audiodg
+│   ├── src/gui/         the control window
+│   ├── src/shared/      shared memory between the two
+│   ├── installer/       registration, and the uninstaller that reverses it
+│   └── docs/            APO-RESEARCH.md and RECOVERY.md
+│
+└── android/             Android — see android/README.md
+    ├── app/src/main/cpp/        JNI bridge, AAudio engine
+    └── app/src/main/java/       Compose UI, capture service, Shizuku
 ```
 
 ## Requirements
 
-Linux with **PipeWire** — Ubuntu 22.10+, Fedora 34+ and most current distros.
-Use **headphones**: the effect relies on each ear hearing a different signal, and
-speakers blend them together.
+Use **headphones** on every platform. The effect relies on each ear hearing a
+different signal; speakers blend them together and most of it disappears.
 
-## Roadmap
-
-A **mobile** build is next, and will sit alongside these two.
+| | |
+| --- | --- |
+| **Linux** | PipeWire — Ubuntu 22.10+, Fedora 34+, most current distros |
+| **Windows** | Windows 10 or 11. Administrator for the install, and one restart |
+| **Android** | 10 or newer. System-wide mode additionally needs Shizuku, once |

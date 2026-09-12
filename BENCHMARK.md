@@ -1,18 +1,69 @@
-# Python vs C++ — measured
+# Measured
 
-Both builds do the same job with the same effect, so the only interesting
-question is what each one costs. Everything below was measured on this machine,
-with the harness in `bench/`; nothing is estimated.
+Nothing here is estimated. Where a figure could not be reproduced on the
+hardware to hand, it says so rather than being quietly dropped.
 
-## How it was measured
+Two different questions are measured, and they matter in different ways:
 
-Runs are **interleaved** — within each repetition both versions are exercised
-back to back, and the order alternates between repetitions — so a machine that
-warms up, throttles or gets busy affects both columns equally. Figures are
-**medians** with the observed spread, because a single timing on a laptop means
-very little.
+1. **Do the builds produce the same audio?** This is the project's central
+   claim, it is checked by rendering the same probe on each platform, and it is
+   reproducible today.
+2. **What does the effect cost?** Measured on the Linux build, on a machine that
+   was explicitly not a quiet benchmark rig.
 
-The machine was not a quiet benchmark rig, and that is worth stating plainly:
+---
+
+## 1. Parity — the builds produce the same audio
+
+The effect exists once, in `cpp/src/dsp/`. Every platform compiles those files
+in place, so "identical everywhere" ought to be true by construction. It is
+checked anyway, because a claim nobody tests is a claim that quietly stops being
+true.
+
+`cpp/tests/dsp_probe.cpp` renders a deterministic signal — a 220 Hz tone, five
+seconds, 512-frame blocks, every movement mode — straight to raw `f32`.
+`cpp/tests/compare_f32.py` compares two sets of those dumps.
+
+| Candidate | Compiler | Arch | Correlation | Largest sample difference |
+| --- | --- | --- | ---: | ---: |
+| Linux | GCC 14 | x86-64 | reference | — |
+| Windows | MSVC 2022 | x86-64 | **1.000000** | **0.000006** |
+| Android | Clang (NDK 29) | x86-64 | **1.000000** | **0.000006** |
+
+Compiler flags are matched deliberately — `-O3 -ffast-math -fno-math-errno` on
+GCC and Clang, `/O2 /fp:fast` on MSVC — because parity to six decimal places
+only means anything if the arithmetic is allowed to be the same.
+
+**Caveat worth stating:** the Android figure was measured on the x86-64
+emulator, not on an ARM device. The `arm64-v8a` library is built from the same
+source with the same flags and has been heard working on hardware, but the probe
+has not been run there. Until it is, ARM parity is expected rather than
+measured.
+
+Reproduce:
+
+```bash
+g++ -std=c++20 -O3 -ffast-math -fno-math-errno \
+    -o dsp_probe cpp/tests/dsp_probe.cpp cpp/src/dsp/Processor.cpp -Icpp/src/dsp
+
+mkdir -p ref && for m in circular pingpong pendulum figure8 spiral static radio slowed; do
+    ./dsp_probe $m ref/$m.f32
+done
+
+python3 cpp/tests/compare_f32.py ref CANDIDATE_DIR
+```
+
+Windows has `windows/parity.ps1`, which builds a GCC reference and compares it
+against the MSVC one. Android renders the same probe from inside the app and the
+dumps are pulled with `adb`.
+
+---
+
+## 2. What the effect costs — Linux
+
+### The machine
+
+Not a quiet benchmark rig, and that is worth stating plainly:
 
 | | |
 | --- | --- |
@@ -21,136 +72,121 @@ The machine was not a quiet benchmark rig, and that is worth stating plainly:
 | Load average | ~1.2 during the runs |
 | Other load | a RustDesk remote session was active throughout |
 
-The spreads show the noise this introduced. It is small relative to every gap
-reported here, and interleaving cancels drift, but absolute numbers on an idle
-desktop would be somewhat better for both sides.
+Figures are medians with the observed spread. Absolute numbers on an idle
+desktop would be somewhat better.
 
-Reproduce with:
+### The DSP itself
 
-```bash
-cd bench
-REPS=5 python3 dsp_bench.py        # the effect itself
-REPS=3 python3 audio_bench.py      # the whole audio path, engines headless
-REPS=5 python3 latency_bench.py    # delay added by the effect
-REPS=3 python3 gui_bench.py        # the interface
-```
+Five seconds of audio through the engine, block by block, as a percentage of
+real time. Lower is better; at or above 100 % it cannot keep up.
 
-## 1. The effect itself
+| Movement mode | Share of real time |
+| --- | ---: |
+| Circular orbit | 0.44 % |
+| Ping-pong | 0.43 % |
+| Pendulum | 0.44 % |
+| Linear sweep | 0.45 % |
+| Figure eight | 0.43 % |
+| Spiral | 0.43 % |
+| Static position | 0.45 % |
+| Slowed & sad | 0.52 % |
+| Old radio | 0.67 % |
 
-Five seconds of identical audio through each engine, block by block, measured as
-percentage of real time — lower is better, and anything at or above 100 % cannot
-keep up.
+Spreads across five repetitions were tight — circular ran 0.430–0.450 %.
 
-| Movement mode | Python | C++ | Speed-up |
-| --- | ---: | ---: | ---: |
-| Circular orbit | 12.84 % | 0.440 % | 29.2× |
-| Ping-pong | 12.84 % | 0.430 % | 29.9× |
-| Pendulum | 12.83 % | 0.440 % | 29.2× |
-| Linear sweep | 12.96 % | 0.450 % | 28.8× |
-| Figure eight | 12.97 % | 0.430 % | 30.2× |
-| Spiral | 12.99 % | 0.430 % | 30.2× |
-| Static position | 13.00 % | 0.450 % | 28.9× |
-| Slowed & sad | 14.36 % | 0.520 % | 27.6× |
-| Old radio | 15.73 % | 0.670 % | 23.5× |
+Old radio is the most expensive mode by a clear margin, which is unsurprising:
+it is the only one that adds band-limiting, saturation, tape wow and a gated
+hiss on top of the orbit.
 
-**Median 29.2×** (range 23.5×–30.2×). Spreads across five repetitions were tight
-— circular, for instance, ran 12.63–13.26 % in Python and 0.430–0.450 % in C++.
+### The whole audio path
 
-The two builds produce numerically identical audio (correlation 1.0000, largest
-sample difference 0.0006), so this is a like-for-like comparison, not a
-comparison of two different effects.
+Run headless against a scratch sink with a tone flowing through it. CPU is
+counted over the entire process tree.
 
-## 2. The whole audio path
+| | |
+| --- | ---: |
+| CPU (process tree) | 2.6 % |
+| Memory (process tree) | 11.8 MB |
+| Processes | 1 |
+| Underruns in 8 s | 0 |
 
-Each engine run headless against a scratch sink with a tone flowing through it.
-CPU is counted over the **entire process tree**, which matters: the Python build
-carries its audio through `pw-record` and `pw-play` subprocesses, and charging
-it only for the parent would flatter it.
+One process is the point. Audio never leaves the address space: two native
+`pw_stream`s with the DSP inside PipeWire's realtime callback, no helper
+processes and no kernel pipes.
 
-| | Python | C++ | |
-| --- | ---: | ---: | ---: |
-| CPU (process tree) | 23.6 % | 2.6 % | **9.0× less** |
-| Memory (process tree) | 134.5 MB | 11.8 MB | **11.4× less** |
-| Processes | 4 | 1 | |
-| Underruns in 8 s | 0 | 0 | both clean |
+### Latency added by the effect
 
-Routing side effects were neutralised so the machine's real audio was never
-touched — but Python's graph housekeeping still ran its `pw-dump` subprocess, so
-that polling cost is included rather than quietly excused.
+Measured by capturing **both sides at once** — the virtual sink's monitor and
+the scratch output — and taking the gap between the signal reaching one and the
+other. Capturing both sides is what makes it trustworthy: the source's own
+buffering appears in both streams and cancels.
 
-## 3. Latency added by the effect
+| | |
+| --- | ---: |
+| Added latency (median) | ~3.5 ms |
+| Spread | 1.8–7.1 ms |
 
-Measured by capturing **both sides at once** — the virtual sink's monitor (what
-goes in) and the scratch output (what comes out) — and taking the gap between
-the signal reaching one and reaching the other. Capturing both sides is what
-makes this trustworthy: the source's own buffering appears in both streams and
-cancels.
+Treat this as "a few milliseconds", not a precise value. It sits close to the
+method's own resolution (~1.3 ms chunks plus capture jitter), and one repetition
+produced a slightly negative result — itself a sign the delay is small enough to
+be hard to measure this way.
 
-| | Python | C++ |
-| --- | ---: | ---: |
-| Added latency (median) | 21.7 ms | 3.5 ms |
-| Spread | 17.8–27.3 ms | 1.8–7.1 ms |
-| Valid samples | 5 of 5 | 4 of 5 |
+The engine runs a 512-frame quantum in process, which is what a user actually
+gets.
 
-**The C++ path adds about 18 ms less.** Two caveats, both real: the C++ figure
-sits close to the method's own resolution (~1.3 ms chunks plus capture jitter),
-and one C++ repetition produced a slightly negative result, which was discarded
-— that is itself a sign the delay is small enough to be hard to measure this
-way. The 18 ms *difference* is the robust number; treat the 3.5 ms as "a few
-milliseconds", not a precise value.
-
-Each version ran at its own default latency setting, which is what a user
-actually gets: Python asks `pw-record`/`pw-play` for 25 ms each and adds two
-pipe hops; C++ runs a 512-frame quantum in process with no pipes.
-
-## 4. The interface
+### The interface
 
 Window open, engine stopped, pointer parked away — how an app spends most of its
 life.
 
-| | Python | C++ | |
-| --- | ---: | ---: | ---: |
-| Time to window | 1601 ms | 91 ms | **17.6× faster** |
-| CPU sitting idle | 20.5 % | 0.5 % | **41× less** |
-| Memory | 121.2 MB | 37.0 MB | **3.3× less** |
+| | |
+| --- | ---: |
+| Time to window | 91 ms |
+| CPU sitting idle | 0.5 % |
+| Memory | 37.0 MB |
 
-The idle figure is the one worth dwelling on. It is not measurement noise: the
-Tk build calls `stage.refresh(...)` unconditionally every 33 ms whether or not
-anything changed, so it repaints thirty times a second forever. The C++ build
-draws **zero frames** when nothing has changed, and repaints only the orbit
-strip when the source is moving.
+The idle figure is deliberate, not luck: the interface draws **zero frames**
+when nothing has changed, and repaints only the orbit strip while the source is
+moving.
 
-## 5. Footprint
+### Footprint
 
-| | Python | C++ |
-| --- | ---: | ---: |
-| What you install | 271 MB `.venv` + 7.7 MB source | **443 KB binary** |
-| Runtime dependencies | NumPy 2.5.1, SciPy 1.18.0, Tk | 45 shared libraries, all already on the system |
-| Source | 4 348 lines | 3 969 lines |
-| Build | — | 17.5 s from clean |
+| | |
+| --- | ---: |
+| Binary | 448 KB |
+| Runtime dependencies | 45 shared libraries, all already on the system |
+| Source | 3 969 lines |
+| Build from clean | 17.5 s |
 
-## What actually explains the gap
+---
 
-Little of this is "C++ is faster than Python". Most of it is architecture, and
-the language mainly made the architecture affordable:
+## 3. Android, on device
 
-- **No helper processes.** Python spawns `pw-record` and `pw-play` and pushes
-  every sample through kernel pipes. C++ runs two native `pw_stream`s in one
-  process, so audio never leaves the address space.
-- **No polling.** Python shells out to `pw-dump` and parses ~1 MB of JSON every
-  couple of seconds to answer "what devices exist". C++ reads the PipeWire
-  registry, which pushes changes to it.
-- **No unconditional repaint.** The interface draws when something changed.
-- The DSP itself is the one place where the language dominates: the same
-  algorithm, allocation-free and in the realtime callback, is ~29× faster.
+Measured with the parity probe running inside the app, which reports its own
+timing as it renders. Redmi Note 12 (Android 14) for the audio path; the
+emulator for the probe figures below.
 
-## Where Python still wins
+| | |
+| --- | ---: |
+| DSP, share of real time | 0.57–1.07 % |
+| Worst single block | 0.114–0.208 ms (budget 10.7 ms) |
+| Output stream | 48 kHz / 256-frame burst, or 44.1 kHz / 882 depending on route |
+| Underruns during playback | 0 |
 
-Worth saying, since a benchmark that only flatters one side is not much use:
+The device negotiates its own rate — 44.1 kHz on one route, 48 kHz on another —
+and the engine takes whatever it is given, because `Processor::init` is handed
+the real rate rather than assuming one.
 
-- It runs anywhere Python and PipeWire's command-line tools exist — no compiler,
-  no development headers.
-- 4 348 lines of Python were quicker to write and are quicker to change than the
-  equivalent C++.
-- The effect is *identical*. If 20 % of one core is not a problem on the machine
-  in question, the Python build is not doing anything wrong.
+---
+
+## A note on this document's history
+
+Earlier versions of this document compared two implementations of the project: a
+reference build and the native rewrite. Only the native one remains, and the
+comparison harness went with the other — every script in it drove both sides.
+
+The figures above are that build's own measurements from those runs. They stand
+as measurements, but they are not reproducible from this tree as it is; the
+harness is in the git history if it is ever wanted back.
+
+The parity check in section 1 is unaffected and runs today.

@@ -1,9 +1,8 @@
 // A live view of the PipeWire graph.
 //
-// The Python build shelled out to pw-dump every couple of seconds and parsed a
-// megabyte of JSON to answer "what sinks exist".  Here the registry pushes
-// changes to us, so the same questions cost nothing and the answers are never
-// stale.
+// Answering "what sinks exist" by polling pw-dump would mean parsing a megabyte
+// of JSON every couple of seconds.  The registry pushes changes to us instead, so
+// the same questions cost nothing and the answers are never stale.
 #pragma once
 #include <pipewire/pipewire.h>
 #include <pipewire/extensions/metadata.h>

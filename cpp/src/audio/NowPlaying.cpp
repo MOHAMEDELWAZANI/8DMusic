@@ -79,7 +79,7 @@ void cleanTrack(std::string& title, std::vector<std::string>& artists) {
         const std::string head = trim(title.substr(0, dash));
         const std::string tail = trim(title.substr(dash + 3));
         // The artist counts as an uploader when its name shows up right at the
-        // front of the title -- the same window Python's build looks in.
+        // front of the title.
         bool uploaderish = names.empty();
         if (!uploaderish) {
             const std::string head = lower(title).substr(

@@ -17,6 +17,14 @@
   headphones.
 </p>
 
+<p align="center">
+  <a href="assets/8d-music-launch.mp4">
+    <img src="docs/launch-poster.jpg" width="360"
+         alt="Launch video: the orbit visualiser with the source swinging around the listener's head. Click to play.">
+  </a>
+</p>
+<p align="center"><sub>▶ <a href="assets/8d-music-launch.mp4">Watch the 28-second launch video</a> — headphones on.</sub></p>
+
 ---
 
 ## One effect, three platforms

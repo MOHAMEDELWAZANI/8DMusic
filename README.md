@@ -18,12 +18,8 @@
 </p>
 
 <p align="center">
-  <a href="assets/8d-music-launch.mp4">
-    <img src="docs/launch-poster.jpg" width="360"
-         alt="Launch video: the orbit visualiser with the source swinging around the listener's head. Click to play.">
-  </a>
+  <img src="assets/8d-music-480w-15fps.gif" width="480" alt="8D Music — spatial audio, live">
 </p>
-<p align="center"><sub>▶ <a href="assets/8d-music-launch.mp4">Watch the 28-second launch video</a> — headphones on.</sub></p>
 
 ---
 

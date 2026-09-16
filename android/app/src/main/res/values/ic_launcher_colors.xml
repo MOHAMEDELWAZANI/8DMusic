@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The app's ground colour, so the icon reads as the same object as the UI. -->
+    <color name="ic_launcher_background">#161514</color>
+</resources>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The lockup from the app: four bars, the cyan swoop and the magenta head.
+  Drawn at the logo's own 512 grid, then scaled into the adaptive icon's safe
+  zone so no launcher mask can clip the dot off the end of the swoop.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group
+        android:pivotX="256"
+        android:pivotY="256"
+        android:scaleX="0.76"
+        android:scaleY="0.76"
+        android:translateY="8">
+        <path
+            android:fillColor="#F3F2F2"
+            android:pathData="M148,222 A22,22 0 0 1 192,222 V270 A22,22 0 0 1 148,270 Z" />
+        <path
+            android:fillColor="#F3F2F2"
+            android:pathData="M211,165 A22,22 0 0 1 255,165 V270 A22,22 0 0 1 211,270 Z" />
+        <path
+            android:fillColor="#F3F2F2"
+            android:pathData="M274,197 A22,22 0 0 1 318,197 V270 A22,22 0 0 1 274,270 Z" />
+        <path
+            android:fillColor="#F3F2F2"
+            android:pathData="M339,250 A22,22 0 0 1 383,250 V270 A22,22 0 0 1 339,270 Z" />
+        <path
+            android:strokeColor="#62C5EE"
+            android:strokeWidth="30"
+            android:strokeLineCap="round"
+            android:pathData="M100,316 C170,382 342,382 408,320" />
+        <path
+            android:fillColor="#FF458E"
+            android:pathData="M410,290 a30,30 0 1 0 0,60 a30,30 0 1 0 0,-60 Z" />
+    </group>
+</vector>

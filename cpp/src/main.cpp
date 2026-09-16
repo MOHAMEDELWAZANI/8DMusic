@@ -24,6 +24,18 @@ int main(int argc, char** argv) {
         engine.shutdown();
         return sinks.empty() ? 1 : 0;
     }
+    // Renders every page and both presentations to PNGs, so the build can be
+    // put side by side with the design file.
+    if (argc > 2 && !std::strcmp(argv[1], "--shot")) {
+        eightd::App app;
+        std::string error;
+        if (!app.shoot(argv[2], error)) {
+            std::fprintf(stderr, "Could not render: %s\n", error.c_str());
+            return 1;
+        }
+        std::printf("Wrote the design pages to %s\n", argv[2]);
+        return 0;
+    }
     if (argc > 1 && !std::strcmp(argv[1], "--version")) {
         std::printf("8D Music (C++) 1.0.0\n");
         return 0;

@@ -1,67 +1,112 @@
 #include "App.h"
+#include "Layout.h"
+#include "Fonts.h"
 #include <X11/keysym.h>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
+#include <sys/wait.h>
+#include <vector>
+#include <unistd.h>
 
 namespace eightd {
-
-namespace {
-constexpr double kRailWidth = 430;
-constexpr double kTopBar    = 66;
-constexpr double kPad       = 26;
-
-std::string pct(double v)      { return fmt("%.0f%%", v * 100); }
-std::string metres(double v)   { return fmt("%.2f m", v); }
-std::string degrees(double v)  { return fmt("%+.0f°", v); }
-std::string ms(double v)       { return fmt("%.0f ms", v * 1000); }
-std::string speedText(double v) {
-    char buf[80];
-    std::snprintf(buf, sizeof buf, "%.2f rot/s · %.1f s", v, 1.0 / std::max(v, 0.01));
-    return buf;
-}
-} // namespace
 
 // --- lifecycle --------------------------------------------------------------
 
 bool App::run(std::string& error) {
+    registerBundledFonts();
     if (!engine_.init(error)) return false;
     nowPlaying_.start();
     loadSettings();
     refreshDevices();
     pushParams();
-    statusColour_ = Theme::light().inkFaint;
+    statusColour_ = Theme::darkTheme().faint;
+    if (!seenWelcome_) welcome_ = 0;
+    else if (!seenTour_) tour_ = 0;
 
     // The registry tells us the moment a device appears or disappears; the flag
     // keeps the reaction on the UI thread where the list is actually used.
     engine_.graph().onSinksChanged = [this] { sinksDirty_ = true; };
 
-    if (!window_.open("8D Music — Real-Time Spatial Audio", 1180, 820, error)) {
+    if (!window_.open("8D Music", int(kDesignW), int(kDesignH), error)) {
         engine_.shutdown();
         return false;
     }
 
+    frameCorner_ = window_.corner();
+    scale_ = window_.scale();
+    opaqueCorners_ = true;
+    if (savedScale_ > 0 && std::fabs(savedScale_ - scale_) > 0.01) {
+        window_.setScale(savedScale_);
+        scale_ = window_.scale();
+    }
+
     window_.onDraw   = [this](cairo_t* cr, int w, int h) { draw(cr, w, h); };
-    window_.onMotion = [this](int x, int y) { ui_.mouseX = x; ui_.mouseY = y; };
+    window_.onMotion = [this](int x, int y) {
+        ui_.mouseX = x / scale_; ui_.mouseY = y / scale_;
+    };
     window_.onMouse  = [this](const MouseEvent& m) {
         staticDirty_ = true;
         if (m.button == 4 || m.button == 5) {           // wheel
             if (m.pressed) ui_.wheel = (m.button == 4) ? -1 : 1;
             return;
         }
-        ui_.mouseX = m.x; ui_.mouseY = m.y;
-        if (m.pressed) { ui_.mouseDown = true; ui_.mousePressed = true; }
-        else           { ui_.mouseDown = false; ui_.mouseReleased = true; }
+        ui_.mouseX = m.x / scale_; ui_.mouseY = m.y / scale_;
+        if (m.pressed) {
+            pressRootX_ = m.rootX; pressRootY_ = m.rootY;
+            const auto now = std::chrono::steady_clock::now();
+            ui_.doubleClick =
+                now - lastPress_ < std::chrono::milliseconds(380);
+            lastPress_ = now;
+            ui_.mouseDown = true; ui_.mousePressed = true;
+        } else {
+            ui_.mouseDown = false; ui_.mouseReleased = true;
+        }
     };
     window_.onKey = [this](const KeyEvent& k) {
         staticDirty_ = true;
-        if (k.keysym == XK_space) { bypass_ = !bypass_; params_.enabled = !bypass_; pushParams(); }
-        else if (k.ctrl && (k.keysym == XK_r || k.keysym == XK_R)) {
+        if (guide_ >= 0 && welcome_ < 0 && tour_ < 0) {
+            if (k.keysym == XK_Escape || k.keysym == XK_Return) guide_ = -1;
+            return;
+        }
+        // A presentation owns the keyboard while it is up.
+        if (welcome_ >= 0 || tour_ >= 0) {
+            int& page = welcome_ >= 0 ? welcome_ : tour_;
+            const int last = welcome_ >= 0 ? 4 : 6;
+            if (k.keysym == XK_Escape) {
+                if (welcome_ >= 0) { welcome_ = -1; seenWelcome_ = true;
+                                     if (!seenTour_) tour_ = 0; }
+                else { tour_ = -1; seenTour_ = true; }
+            } else if (k.keysym == XK_Right || k.keysym == XK_Return ||
+                       k.keysym == XK_space) {
+                if (page < last) ++page;
+                else if (welcome_ >= 0) { welcome_ = -1; seenWelcome_ = true;
+                                          if (!seenTour_) tour_ = 0; }
+                else { tour_ = -1; seenTour_ = true; }
+            } else if (k.keysym == XK_Left && page > 0) {
+                --page;
+            }
+            return;
+        }
+        if (k.keysym == XK_space) {
+            bypass_ = !bypass_; params_.enabled = !bypass_; pushParams();
+        } else if (k.ctrl && (k.keysym == XK_r || k.keysym == XK_R)) {
             if (k.shift) resetSettings(); else startStop();
         } else if (k.ctrl && (k.keysym == XK_t || k.keysym == XK_T)) {
             dark_ = !dark_;
+        } else if (k.ctrl && (k.keysym == XK_plus || k.keysym == XK_equal ||
+                              k.keysym == XK_minus || k.keysym == XK_underscore)) {
+            const bool up = k.keysym == XK_plus || k.keysym == XK_equal;
+            window_.setScale(window_.scale() + (up ? 0.25 : -0.25));
+            scale_ = window_.scale();
+            savedScale_ = scale_;
+            setStatus(fmt("Interface at %.0f%%", scale_ * 100), ui_.theme.faint);
         } else if (k.keysym == XK_Escape) {
-            ui_.openMenu = 0;
+            if (guide_ >= 0) guide_ = -1; else ui_.openMenu = 0;
         }
+        // No digit shortcuts for the pages: XLookupKeysym reads the first level
+        // of the keyboard map, and on an AZERTY layout that is not a digit at
+        // all.  The tab pills are the way between pages.
     };
     window_.onIdle = [this] {
         if (sinksDirty_) { sinksDirty_ = false; refreshDevices(); }
@@ -107,9 +152,12 @@ bool App::run(std::string& error) {
                     apps.push_back(s.app);
                 nowPlaying_.setCapturedApps(std::move(apps));
             }
-            return true;                      // the orbit is moving
+            return welcome_ == 0 ||
+                   (page_ == Page::Studio && welcome_ < 0 && tour_ < 0);
         }
-        return meterL_ > 0.001 || meterR_ > 0.001;
+        return welcome_ == 0 ||
+               (page_ == Page::Studio && welcome_ < 0 && tour_ < 0 &&
+                (meterL_ > 0.001 || meterR_ > 0.001));
     };
     window_.onClose = [this] { saveSettings(); };
 
@@ -122,7 +170,18 @@ bool App::run(std::string& error) {
 }
 
 void App::setStatus(const std::string& text, const Rgb& colour) {
-    status_ = text; statusColour_ = colour; staticDirty_ = true;
+    status_ = text; statusColour_ = colour;
+    statusAt_ = std::chrono::steady_clock::now();
+    staticDirty_ = true;
+}
+
+void App::setPage(Page p) {
+    if (page_ == p) return;
+    page_ = p;
+    ui_.openMenu = 0;
+    dynamic_ = {};
+    staticDirty_ = true;
+    if (p == Page::Studio && !seenTour_ && welcome_ < 0) tour_ = 0;
 }
 
 void App::refreshDevices() {
@@ -140,16 +199,16 @@ void App::startStop() {
     if (engine_.running()) {
         engine_.stop();
         trail_.clear();
-        setStatus("Stopped. Audio is back to normal.", ui_.theme.inkFaint);
+        setStatus("Stopped. Audio is back to normal.", ui_.theme.faint);
         return;
     }
     if (sinks_.empty() || device_ >= int(sinks_.size())) {
-        setStatus("Pick an output device first.", ui_.theme.motionText);
+        setStatus("Pick an output device first.", ui_.theme.motion);
         return;
     }
     std::string err;
     if (!engine_.start(sinks_[device_].name, kLatencies[latency_].quantum, err)) {
-        setStatus("Could not start: " + err, ui_.theme.motionText);
+        setStatus("Could not start: " + err, ui_.theme.motion);
         return;
     }
     lastSweep_ = std::chrono::steady_clock::now();
@@ -166,7 +225,7 @@ void App::applyPreset(int index) {
     params_.enabled = wasEnabled;
     preset_ = index;
     pushParams();
-    setStatus(std::string("Preset applied: ") + list[index].name, ui_.theme.accentText);
+    setStatus(std::string("Preset applied: ") + list[index].name, ui_.theme.accent);
 }
 
 void App::resetSettings() {
@@ -177,42 +236,123 @@ void App::resetSettings() {
     preset_ = -1;
     pushParams();
     setStatus("Reset — every effect setting is back to its default.",
-              ui_.theme.accentText);
+              ui_.theme.accent);
+}
+
+// Handing a URL to the desktop, without a shell in the middle.
+void App::openUrl(const std::string& url) {
+    const pid_t pid = fork();
+    if (pid == 0) {
+        setsid();
+        ::execlp("xdg-open", "xdg-open", url.c_str(), (char*)nullptr);
+        _exit(127);
+    }
+    if (pid > 0) {
+        // Reaped on the next pass; nothing here waits on a browser starting.
+        int st = 0;
+        waitpid(pid, &st, WNOHANG);
+    }
 }
 
 // --- drawing -----------------------------------------------------------------
 
 void App::drawChrome(cairo_t* cr, int w, int h) {
     ui_.useCr(cr);
+    ui_.syncTransform();
     ui_.beginHitTest();
     auto T = [] { return std::chrono::steady_clock::now(); };
-    auto ms = [](auto a, auto b) {
+    auto msOf = [](auto a, auto b) {
         return std::chrono::duration<double, std::milli>(b - a).count(); };
 
     auto t0 = T();
-    ui_.fillRect({0, 0, double(w), double(h)}, ui_.theme.ground);
-    auto t1 = T(); bgMs_ += ms(t0, t1);
 
-    const Rect top{0, 0, double(w), kTopBar};
-    const Rect rail{double(w) - kRailWidth, kTopBar,
-                    kRailWidth, double(h) - kTopBar};
-    const Rect stage{0, kTopBar, double(w) - kRailWidth, double(h) - kTopBar - 42};
+    // The window wears no decoration, so the frame is ours to paint: start
+    // from nothing, then lay the page on as a rounded plate.  Everything after
+    // this is clipped to that plate.
+    if (opaqueCorners_) {
+        ui_.fillRect({0, 0, double(w), double(h)}, ui_.theme.ground);
+    } else {
+        cairo_save(cr);
+        cairo_set_operator(cr, CAIRO_OPERATOR_CLEAR);
+        cairo_paint(cr);
+        cairo_restore(cr);
+    }
 
-    drawTopBar(top);
-    auto t2 = T(); topMs_ += ms(t1, t2);
-    drawStage(stage);            // records `dynamic_` and paints the chips
-    auto t3 = T(); stageMs_ += ms(t2, t3);
-    drawRail(rail);
-    auto t4 = T(); railMs_ += ms(t3, t4);
+    // The interface is drawn at one size and centred.  The window asks not to
+    // be resized, but a window manager is free to ignore that, and a page that
+    // is centred in whatever it gets is better than one that is stretched.
+    const Rect full{std::max(0.0, (double(w) - kDesignW) * 0.5),
+                    std::max(0.0, (double(h) - kDesignH) * 0.5),
+                    std::min(double(w), kDesignW), std::min(double(h), kDesignH)};
 
-    const Rect strip{kPad, double(h) - 38, double(w) - kRailWidth - kPad * 2, 24};
-    ui_.font(12.5);
-    ui_.text(strip.x, strip.y + strip.h * 0.5, status_, statusColour_);
+    // No shadow: the corners are cut out of the window itself, so there is
+    // nothing behind the app to paint on.
+    const double corner = frameCorner_;
+    ui_.fillRound(full, corner, ui_.theme.ground);
+    cairo_save(cr);
+    ui_.roundRect(full, corner);
+    cairo_clip(cr);
+
+    // The light this layout stands in: the stage is lit from the middle, with
+    // one warm source off to the right of it.
+    if (page_ == Page::Studio && welcome_ < 0) {
+        // Kept below the title bar: a light that washes the chrome makes the
+        // bar look like part of the stage, which it is not.
+        cairo_save(cr);
+        cairo_rectangle(cr, full.cx() - 490, full.y + 96, 980, 640);
+        cairo_clip(cr);
+        ui_.glow(full.cx(), full.y + 390, 510, ui_.theme.accent,
+                 ui_.theme.dark ? 0.17 : 0.08);
+        ui_.glow(full.cx() + 118, full.y + 262, 451, ui_.theme.motion,
+                 ui_.theme.dark ? 0.16 : 0.07);
+        cairo_restore(cr);
+    }
+    auto t1 = T(); bgMs_ += msOf(t0, t1);
+
+    if (welcome_ >= 0) {
+        drawWelcome(full);
+    } else {
+        const Rect top{full.x, full.y, full.w, kTopBar};
+        const Rect body{full.x, full.y + kTopBar, full.w, full.h - kTopBar};
+
+        // While a presentation or a guide is up it owns the pointer: the page
+        // behind it is still painted, but nothing in it can be clicked through.
+        const bool overlay = tour_ >= 0 || guide_ >= 0;
+        const double keepX = ui_.mouseX, keepY = ui_.mouseY;
+        if (overlay) { ui_.mouseX = -1e6; ui_.mouseY = -1e6; }
+
+        drawTopBar(top);
+        auto t2 = T(); topMs_ += msOf(t1, t2);
+
+        switch (page_) {
+            case Page::Studio:  drawStudio(body); break;
+            case Page::About:   drawAbout(body);  break;
+            case Page::Account: drawAccount(body); break;
+        }
+        auto t3 = T(); stageMs_ += msOf(t2, t3);
+
+        drawSourceMenu();
+
+        if (overlay) {
+            ui_.mouseX = keepX; ui_.mouseY = keepY;
+            dynamic_ = {};             // nothing animates under a dialog
+            if (tour_ >= 0) drawTour(full);
+            else            drawGuide(full);
+        }
+    }
+
+    // the hairline that separates the plate from the desktop behind it
+    ui_.strokeRound(full, corner, ui_.theme.text, 1, 0.08);
+    cairo_restore(cr);
 }
 
 void App::draw(cairo_t* cr, int w, int h) {
     ui_.theme = dark_ ? Theme::darkTheme() : Theme::light();
+    ui_.shift = window_.shiftHeld();
     ui_.beginFrame();
+
+    const double s = scale_;
+    const int lw = int(w / s), lh = int(h / s);
 
     if (!cache_ || cacheW_ != w || cacheH_ != h) {
         if (cacheCr_) cairo_destroy(cacheCr_);
@@ -239,8 +379,12 @@ void App::draw(cairo_t* cr, int w, int h) {
         // control only catches up on the next unrelated repaint.
         staticDirty_ = false;
         hoveredIndex_ = hovered;
+        dynamic_ = {};
         const auto t0 = std::chrono::steady_clock::now();
-        drawChrome(cacheCr_, w, h);
+        cairo_save(cacheCr_);
+        cairo_scale(cacheCr_, s, s);
+        drawChrome(cacheCr_, lw, lh);
+        cairo_restore(cacheCr_);
         cairo_surface_flush(cache_);
         chromeMs_ += std::chrono::duration<double, std::milli>(
             std::chrono::steady_clock::now() - t0).count();
@@ -250,20 +394,25 @@ void App::draw(cairo_t* cr, int w, int h) {
 
     ui_.useCr(cr);
     const auto tb = std::chrono::steady_clock::now();
+    // The cache is a picture of the window in real pixels, so it is blitted
+    // with the transform out of the way.
+    cairo_identity_matrix(cr);
     if (full || dynamic_.w <= 0) {
         cairo_set_source_surface(cr, cache_, 0, 0);
         cairo_paint(cr);
         window_.damageAll();
-    } else {   // only the orbit strip changed
+    } else {
         // Only the orbit strip changed: restore that patch from the cache and
         // repaint it, then tell the window to push just those pixels.
         cairo_save(cr);
-        cairo_rectangle(cr, dynamic_.x, dynamic_.y, dynamic_.w, dynamic_.h);
+        cairo_rectangle(cr, dynamic_.x * s, dynamic_.y * s,
+                        dynamic_.w * s, dynamic_.h * s);
         cairo_clip(cr);
         cairo_set_source_surface(cr, cache_, 0, 0);
         cairo_paint(cr);
         cairo_restore(cr);
-        window_.setDamage(dynamic_.x, dynamic_.y, dynamic_.w, dynamic_.h);
+        window_.setDamage(dynamic_.x * s, dynamic_.y * s,
+                          dynamic_.w * s, dynamic_.h * s);
     }
     blitMs_ += std::chrono::duration<double, std::milli>(
         std::chrono::steady_clock::now() - tb).count();
@@ -271,11 +420,17 @@ void App::draw(cairo_t* cr, int w, int h) {
     const auto tl = std::chrono::steady_clock::now();
     if (dynamic_.w > 0) {
         cairo_save(cr);
+        cairo_scale(cr, s, s);
+        ui_.syncTransform();
         cairo_rectangle(cr, dynamic_.x, dynamic_.y, dynamic_.w, dynamic_.h);
         cairo_clip(cr);
-        drawOrbitLive(orbitRect_);
-        drawReadout(orbitRect_);
-        drawMeters({orbitRect_.x, orbitRect_.y + orbitRect_.h + 36, orbitRect_.w, 22});
+        if (welcome_ == 0) {
+            drawWelcomeMark(orbitRect_);
+        } else {
+            drawOrbitLive(orbitRect_);
+            drawReadout(readoutRect_);
+            drawMeters(metersRect_);
+        }
         cairo_restore(cr);
     }
     liveMs_ += std::chrono::duration<double, std::milli>(
@@ -284,375 +439,156 @@ void App::draw(cairo_t* cr, int w, int h) {
     ui_.endFrame();
 }
 
+// --- the title bar --------------------------------------------------------
+
 void App::drawTopBar(const Rect& r) {
-    ui_.fillRect(r, ui_.theme.chrome);
-    ui_.fillRect({r.x, r.y + r.h - 1, r.w, 1}, ui_.theme.line);
+    ui_.fillRect({r.x, r.y + r.h - 1, r.w, 1}, ui_.theme.text, 0.05);
 
-    // wordmark
-    ui_.font(15, true);
-    ui_.tracked(kPad, r.h * 0.5, "8D MUSIC", ui_.theme.ink, 2.4);
+    ui_.logo({r.x + 20, r.cy() - 12, 24, 24});
+    ui_.font(11, W700);
+    ui_.tracked(r.x + 56, r.cy(), "8D MUSIC", ui_.theme.dim, 2.0);
 
-    // theme switch
-    const Rect seg{r.w - kPad - 132, r.h * 0.5 - 15, 132, 30};
-    const int pick = ui_.segmented(900, seg, {"Light", "Dark"}, dark_ ? 1 : 0);
-    if (pick >= 0) { dark_ = (pick == 1); staticDirty_ = true; }
-
-}
-
-void App::drawStage(const Rect& r) {
-    const double side = std::min(r.w - kPad * 2, r.h - 210);
-    const Rect orbit{r.x + (r.w - side) * 0.5, r.y + 18, side, side};
-    orbitRect_ = orbit;
-    // everything that moves lives in this strip
-    dynamic_ = {orbit.x - 4, orbit.y - 4, orbit.w + 8, orbit.h + 70};
-    drawOrbitStatic(orbit);
-
-    // presets
-    // presets
-    int count = 0;
-    const Preset* list = presets(count);
-    const double chipH = 30, gap = 8;
-    double x = orbit.x, y = orbit.y + orbit.h + 74;
-    ui_.font(13);
-    for (int i = 0; i < count; ++i) {
-        const double tw = ui_.textWidth(list[i].name) + 26;
-        if (x + tw > orbit.x + orbit.w) { x = orbit.x; y += chipH + gap; }
-        if (ui_.chip(1000 + i, {x, y, tw, chipH}, list[i].name, preset_ == i))
-            applyPreset(i);
-        x += tw + gap;
+    // the three pages, as pills
+    struct TabDef { const char* label; const Icon* ic; Page page; int id; };
+    const TabDef tabs[] = {
+        {"Studio",  &ico::kStudio,  Page::Studio,  kIdTabStudio},
+        {"About",   &ico::kAbout,   Page::About,   kIdTabAbout},
+        {"Account", &ico::kAccount, Page::Account, kIdTabAccount},
+    };
+    double widths[3], total = 8;
+    ui_.font(13.5, W600);
+    for (int i = 0; i < 3; ++i) {
+        widths[i] = ui_.textWidth(tabs[i].label) + 16 + 7 + 36;
+        total += widths[i] + (i ? 4 : 0);
     }
-}
-
-void App::drawReadout(const Rect& orbit) {
-    const double ang = engine_.processor().angle();
-    double deg = std::fmod(ang * 180.0 / M_PI + 180.0, 360.0);
-    if (deg < 0) deg += 360.0;
-    deg -= 180.0;
-    const char* where = deg > 6 ? "right" : (deg < -6 ? "left" : "centre");
-    char line[192];
-    if (engine_.running())
-        std::snprintf(line, sizeof line, "%+.0f°  ·  %.2f m  ·  %s   ·   cpu %.0f%%",
-                      deg, engine_.processor().distance(), where,
-                      engine_.status().load * 100.0);
-    else
-        std::snprintf(line, sizeof line, "%+.0f°  ·  %.2f m  ·  %s",
-                      deg, engine_.processor().distance(), where);
-    ui_.font(13);
-    ui_.text(orbit.x, orbit.y + orbit.h + 20, line, ui_.theme.inkSoft);
-}
-
-void App::drawOrbitStatic(const Rect& r) {
-    cairo_t* cr = ui_.cr;
-    const double cx = r.x + r.w * 0.5, cy = r.y + r.h * 0.5;
-    const double scale = r.w * 0.45;
-
-    // rings
-    for (double ring : {0.94, 0.66, 0.38}) {
-        ui_.setColour(ui_.theme.lineSoft);
-        cairo_set_line_width(cr, 1);
-        cairo_new_path(cr);
-        cairo_arc(cr, cx, cy, scale * ring, 0, 2 * M_PI);
-        cairo_stroke(cr);
+    Rect bar{r.cx() - total * 0.5, r.cy() - 21, total, 42};
+    ui_.fillRound(bar, kPill, ui_.theme.card);
+    double x = bar.x + 4;
+    for (int i = 0; i < 3; ++i) {
+        const Rect cell{x, bar.y + 4, widths[i], 34};
+        const bool on = page_ == tabs[i].page;
+        if (ui_.click(tabs[i].id, cell)) setPage(tabs[i].page);
+        if (on) ui_.fillRound(cell, kPill, ui_.theme.raised);
+        else if (ui_.over(cell)) ui_.fillRound(cell, kPill, ui_.theme.well);
+        const Rgb c = on ? ui_.theme.text : ui_.theme.faint;
+        ui_.icon(*tabs[i].ic, {cell.x + 16, cell.cy() - 8, 16, 16}, c);
+        ui_.font(13.5, W600);
+        ui_.text(cell.x + 16 + 16 + 7, cell.cy(), tabs[i].label, c);
+        x += widths[i] + 4;
     }
-    // cross
-    ui_.setColour(ui_.theme.lineSoft);
-    cairo_set_line_width(cr, 1);
-    cairo_new_path(cr);
-    cairo_move_to(cr, cx, r.y); cairo_line_to(cr, cx, r.y + r.h);
-    cairo_move_to(cr, r.x, cy); cairo_line_to(cr, r.x + r.w, cy);
-    cairo_stroke(cr);
 
-    ui_.font(10, true);
-    ui_.tracked(cx - 18, r.y + 8, "FRONT", ui_.theme.inkGhost, 1.4);
-    ui_.tracked(cx - 14, r.y + r.h - 8, "BACK", ui_.theme.inkGhost, 1.4);
-    ui_.text(r.x + 6, cy, "L", ui_.theme.inkGhost);
-    ui_.text(r.x + r.w - 6, cy, "R", ui_.theme.inkGhost, Align::Right);
-
-    // the listener
-    const double head = std::max(scale * 0.11, 14.0);
-    ui_.setColour(ui_.theme.line);
-    cairo_set_line_width(cr, 2);
-    cairo_new_path(cr);
-    cairo_arc(cr, cx, cy, head, 0, 2 * M_PI);
-    cairo_stroke(cr);
-    for (double dx : {-head, head}) {
-        cairo_new_path(cr);
-        cairo_arc(cr, cx + dx, cy, head * 0.24, 0, 2 * M_PI);
-        cairo_stroke(cr);
-    }
-    ui_.setColour(ui_.theme.inkGhost);
-    cairo_new_path(cr);
-    cairo_move_to(cr, cx, cy - head - head * 0.42);
-    cairo_line_to(cr, cx - head * 0.28, cy - head + head * 0.05);
-    cairo_line_to(cr, cx + head * 0.28, cy - head + head * 0.05);
-    cairo_close_path(cr);
-    cairo_fill(cr);
-
-}
-
-// Everything below moves, so it is never baked into the cached chrome: the
-// cache would otherwise keep a stale dot and the new frame would draw over it.
-void App::drawOrbitLive(const Rect& r) {
-    cairo_t* cr = ui_.cr;
-    const double cx = r.x + r.w * 0.5, cy = r.y + r.h * 0.5;
-    const double scale = r.w * 0.45;
+    // what we are carrying, and the master switch
+    const Track t = nowPlaying_.track();
     const bool running = engine_.running();
-    const double dashes[2] = {3, 6};
+    const std::string source = running ? "System audio" : "Not capturing";
+    std::string detail = nowPlaying_.has() && !t.player.empty()
+                       ? t.player
+                       : (sinks_.empty() ? "no output"
+                          : sinks_[std::min<size_t>(device_, sinks_.size() - 1)].label());
+    ui_.font(13, W400);
+    const double dw = ui_.textWidth(detail);
+    ui_.font(13, W600);
+    const double sw = ui_.textWidth(source);
+    const double pillW = 14 + 8 + 8 + sw + 8 + 6 + 8 + dw + 14;
 
-    const double angle = engine_.processor().angle();
-    const double dist  = std::clamp(double(engine_.processor().distance()), 0.2, 3.0);
-    const double rad   = dist / 3.0 * scale;
-    const double sx = cx + std::sin(angle) * rad;
-    const double sy = cy - std::cos(angle) * rad;
+    // The window's own buttons sit at the trailing edge, where this desktop
+    // puts them.  There is no maximise: the window is one size.
+    const double buttonsX = r.x + r.w - 12 - 36 - 2 - 36;
+    const Rect swBox{buttonsX - 16 - 44, r.cy() - 13, 44, 26};
+    ui_.font(12, W700);
+    const double lw = ui_.textWidth("8D") + 5;
+    const Rect pillR{swBox.x - lw - 14 - pillW, r.cy() - 17, pillW, 34};
 
-    // the orbit it is travelling
-    ui_.setColour(ui_.theme.accent, 0.5);
-    cairo_set_line_width(cr, 1.2);
-    cairo_set_dash(cr, dashes, 2, 0);
-    cairo_new_path(cr);
-    cairo_arc(cr, cx, cy, rad, 0, 2 * M_PI);
-    cairo_stroke(cr);
-    cairo_set_dash(cr, nullptr, 0, 0);
+    // The pill is its own control: it says what we are carrying, and opens the
+    // list of outputs when clicked.
+    ui_.noteHit(pillR);
+    const bool overPill = pillR.contains(ui_.mouseX, ui_.mouseY);
+    if (overPill && ui_.mousePressed && !sinks_.empty())
+        ui_.openMenu = (ui_.openMenu == kIdSource) ? 0 : kIdSource;
+    ui_.fillRound(pillR, kPill,
+                  overPill ? mix(ui_.theme.card, ui_.theme.text, 0.07)
+                           : ui_.theme.card);
+    const double ledX = pillR.x + 14 + 4;
+    if (running) ui_.glow(ledX, pillR.cy(), 11, ui_.theme.deep, 0.5);
+    ui_.circle(ledX, pillR.cy(), 4, running ? ui_.theme.deep : ui_.theme.ghost);
+    ui_.font(13, W600);
+    ui_.text(pillR.x + 14 + 8 + 8, pillR.cy(), source, ui_.theme.text);
+    ui_.font(13, W400);
+    ui_.text(pillR.x + 14 + 8 + 8 + sw + 8, pillR.cy(), "·", ui_.theme.faint);
+    ui_.text(pillR.x + 14 + 8 + 8 + sw + 8 + 6 + 8, pillR.cy(), detail, ui_.theme.dim);
 
-    trail_.push_back({sx, sy});
-    while (trail_.size() > 52) trail_.pop_front();
-    const size_t n = trail_.size();
-    for (size_t i = 0; i + 1 < n; ++i) {
-        const double f = double(i) / double(std::max<size_t>(n - 1, 1));
-        ui_.setColour(running ? ui_.theme.motion : ui_.theme.inkGhost, f * 0.5);
-        cairo_new_path(cr);
-        cairo_arc(cr, trail_[i].first, trail_[i].second, 1.0 + f * 2.6, 0, 2 * M_PI);
-        cairo_fill(cr);
+    ui_.font(12, W700);
+    ui_.tracked(swBox.x - lw - 9, r.cy(), "8D", ui_.theme.deep, 1.2);
+    if (ui_.switchPill(kIdSwitch, swBox, !bypass_)) {
+        bypass_ = !bypass_; params_.enabled = !bypass_; pushParams();
     }
 
-    ui_.setColour(ui_.theme.accent, 0.16);
-    cairo_new_path(cr);
-    cairo_arc(cr, sx, sy, 17, 0, 2 * M_PI); cairo_fill(cr);
-    ui_.setColour(running ? ui_.theme.accent : ui_.theme.inkGhost);
-    cairo_new_path(cr);
-    cairo_arc(cr, sx, sy, 7, 0, 2 * M_PI); cairo_fill(cr);
-
-    ui_.setColour(ui_.theme.accent, 0.35);
-    cairo_set_line_width(cr, 1);
-    cairo_set_dash(cr, dashes, 2, 0);
-    cairo_new_path(cr);
-    cairo_move_to(cr, cx, cy); cairo_line_to(cr, sx, sy);
-    cairo_stroke(cr);
-    cairo_set_dash(cr, nullptr, 0, 0);
+    drawWindowButtons(r, {pillR, swBox, bar});
+    sourcePill_ = pillR;
 }
 
-void App::drawMeters(const Rect& r) {
-    const double lvlL = engine_.processor().peakL();
-    const double lvlR = engine_.processor().peakR();
-    meterL_ = std::max(double(lvlL), meterL_ * 0.82);
-    meterR_ = std::max(double(lvlR), meterR_ * 0.82);
+double App::drawWindowButtons(const Rect& bar, const std::vector<Rect>& controls) {
+    const double btn = 36;
+    const Rect closeBtn{bar.x + bar.w - 12 - btn, bar.y + (bar.h - btn) * 0.5, btn, btn};
+    const Rect minBtn{closeBtn.x - 2 - btn, closeBtn.y, btn, btn};
+    cairo_t* cr = ui_.cr;
 
-    const char* names[2] = {"L", "R"};
-    const double vals[2] = {meterL_, meterR_};
-    for (int i = 0; i < 2; ++i) {
-        const Rect row{r.x, r.y + i * 14.0, r.w, 10};
-        ui_.font(10, true);
-        ui_.text(row.x, row.y + 5, names[i], ui_.theme.inkGhost);
-        const Rect track{row.x + 18, row.y + 2.5, row.w - 18, 5};
-        ui_.fillRound(track, 2, ui_.theme.lineSoft);
-        const double t = std::clamp(vals[i], 0.0, 1.0);
-        if (t > 0.002) {
-            const Rgb c = t < 0.7 ? ui_.theme.good
-                        : (t < 0.9 ? ui_.theme.warn : ui_.theme.motion);
-            ui_.fillRound({track.x, track.y, track.w * t, track.h}, 2.5, c);
+    if (ui_.click(kIdMinimise, minBtn)) window_.minimise();
+    if (ui_.over(minBtn)) ui_.fillRound(minBtn, 12, ui_.theme.well);
+    ui_.setColour(ui_.over(minBtn) ? ui_.theme.text : ui_.theme.faint);
+    cairo_set_line_width(cr, 1.8);
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+    cairo_new_path(cr);
+    cairo_move_to(cr, minBtn.cx() - 7, minBtn.cy());
+    cairo_line_to(cr, minBtn.cx() + 7, minBtn.cy());
+    cairo_stroke(cr);
+
+    const bool overClose = ui_.over(closeBtn);
+    if (ui_.click(kIdClose, closeBtn)) { saveSettings(); window_.quit(); }
+    if (overClose) ui_.fillRound(closeBtn, 12, Rgb::hex(0xE5484D));
+    ui_.setColour(overClose ? Rgb::hex(0xFFFFFF) : ui_.theme.faint);
+    cairo_new_path(cr);
+    cairo_move_to(cr, closeBtn.cx() - 6, closeBtn.cy() - 6);
+    cairo_line_to(cr, closeBtn.cx() + 6, closeBtn.cy() + 6);
+    cairo_move_to(cr, closeBtn.cx() + 6, closeBtn.cy() - 6);
+    cairo_line_to(cr, closeBtn.cx() - 6, closeBtn.cy() + 6);
+    cairo_stroke(cr);
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_BUTT);
+
+    // Anywhere else along the bar is a handle: press it and the window moves.
+    // The window manager does the dragging -- it knows about edges, monitors
+    // and workspaces, and we do not.
+    if (ui_.mousePressed && bar.contains(ui_.mouseX, ui_.mouseY) &&
+        !minBtn.contains(ui_.mouseX, ui_.mouseY) &&
+        !closeBtn.contains(ui_.mouseX, ui_.mouseY)) {
+        bool onControl = false;
+        for (const Rect& c : controls)
+            if (c.contains(ui_.mouseX, ui_.mouseY)) { onControl = true; break; }
+        if (!onControl) {
+            window_.startDrag(pressRootX_, pressRootY_);
+            // The window manager owns the pointer from here, so the release
+            // never arrives; end the press ourselves or every control stays
+            // armed.
+            ui_.mouseDown = false;
+            ui_.active = 0;
         }
     }
+    return minBtn.x;
 }
 
-} // namespace eightd
-
-namespace eightd {
-
-// The rail carries every parameter, so it scrolls.  Content is drawn into a
-// clip with a scroll offset rather than into its own surface: at this size the
-// clip costs nothing and keeps the widget code oblivious to scrolling.
-void App::drawRail(const Rect& r) {
-    ui_.fillRect(r, ui_.theme.rail);
-    ui_.fillRect({r.x, r.y, 1, r.h}, ui_.theme.line);
-
-    if (r.contains(ui_.mouseX, ui_.mouseY) && ui_.wheel != 0) {
-        railScroll_ = std::clamp(railScroll_ + ui_.wheel * 54.0, 0.0,
-                                 std::max(0.0, railHeight_ - r.h + 30));
-        staticDirty_ = true;
-    }
-
-    cairo_save(ui_.cr);
-    cairo_rectangle(ui_.cr, r.x, r.y, r.w, r.h);
-    cairo_clip(ui_.cr);
-
-    const double x = r.x + kPad;
-    const double w = r.w - kPad * 2 - 6;
-    double y = r.y + 22 - railScroll_;
-
-    y = drawNowPlaying(r, y);
-    ui_.fillRect({x, y + 6, w, 1}, ui_.theme.line);
-    y += 14;
-
-    auto section = [&](const char* title) {
-        y += 14;                       // air above every heading
-        ui_.font(11, true);
-        ui_.tracked(x, y + 6, title, ui_.theme.accentText, 1.8);
-        y += 30;
-    };
-    auto slider = [&](int id, const char* label, double& value, double lo, double hi,
-                      const std::string& readout, const char* hint = "",
-                      bool enabled = true) {
-        if (ui_.slider(id, {x, y, w, 34}, label, readout, value, lo, hi, hint, enabled)) {
-            preset_ = -1;
-            pushParams();
-        }
-        y += (hint && *hint) ? 74 : 56;
-    };
-
-    // ---- movement --------------------------------------------------------
-    section("MOVEMENT");
-    const Rect modeBox{x, y, w * 0.56 - 5, 34};
-    const Rect dirBox{x + w * 0.56 + 5, y, w * 0.44 - 5, 34};
-    ui_.dropdown(100, modeBox, modeLabel(params_.mode));
-    ui_.dropdown(101, dirBox, params_.direction >= 0 ? "Clockwise" : "Counter-cw");
-    y += 48;
-
-    double speed = params_.speed;
-    slider(102, "Movement speed", speed, 0.01, 1.2, speedText(speed),
-           "How fast the source travels around you", params_.mode != Mode::Static);
-    params_.speed = float(speed);
-
-    double radius = params_.radius;
-    slider(103, "Orbit radius", radius, 0.25, 3.0, metres(radius),
-           "Virtual distance — affects level, tone and room");
-    params_.radius = float(radius);
-
-    double depth = params_.depth;
-    slider(104, "Effect depth", depth, 0.0, 1.0, pct(depth),
-           "How far through the stereo field it swings");
-    params_.depth = float(depth);
-
-    double smooth = params_.smoothness;
-    slider(105, "Smoothness", smooth, 0.0, 1.0, pct(smooth),
-           "Rounds off the motion — higher is more gradual");
-    params_.smoothness = float(smooth);
-
-    double manual = params_.manualAngle * 180.0 / M_PI;
-    slider(106, "Manual position", manual, -180, 180, degrees(manual),
-           "Used by the Static position mode", params_.mode == Mode::Static);
-    params_.manualAngle = float(manual * M_PI / 180.0);
-
-    if (ui_.checkbox(107, {x, y, w, 24}, "Pause the orbit when nothing plays",
-                     reinterpret_cast<bool&>(params_.pauseWhenSilent)))
-        pushParams();
-    y += 40;
-
-    // ---- character --------------------------------------------------------
-    section("CHARACTER");
-    const Rect charBox{x, y, w, 34};
-    ui_.dropdown(110, charBox, characterLabel(params_.character));
-    y += 48;
-    double amount = params_.characterAmount;
-    slider(111, "Character amount", amount, 0.0, 1.0, pct(amount),
-           characterHint(params_.character), params_.character != Character::Clean);
-    params_.characterAmount = float(amount);
-
-    // ---- space -------------------------------------------------------------
-    section("SPACE");
-    double width = params_.width;
-    slider(120, "Stereo width", width, 0.0, 2.0, pct(width),
-           "Width of the source before it enters the orbit");
-    params_.width = float(width);
-
-    const double halfW = w * 0.5 - 8;
-    auto pair = [&](int idA, const char* la, double& va, double loa, double hia,
-                    const std::string& ra,
-                    int idB, const char* lb, double& vb, double lob, double hib,
-                    const std::string& rb) {
-        if (ui_.slider(idA, {x, y, halfW, 34}, la, ra, va, loa, hia)) { preset_ = -1; pushParams(); }
-        if (ui_.slider(idB, {x + w - halfW, y, halfW, 34}, lb, rb, vb, lob, hib)) { preset_ = -1; pushParams(); }
-        y += 56;
-    };
-    double dMix = params_.delayMix, rMix = params_.reverbMix;
-    pair(121, "Delay", dMix, 0.0, 1.0, pct(dMix),
-         124, "Reverb", rMix, 0.0, 1.0, pct(rMix));
-    params_.delayMix = float(dMix); params_.reverbMix = float(rMix);
-
-    double dTime = params_.delayTime, rSize = params_.reverbSize;
-    pair(122, "Delay time", dTime, 0.04, 1.2, ms(dTime),
-         125, "Room size", rSize, 0.0, 1.0, pct(rSize));
-    params_.delayTime = float(dTime); params_.reverbSize = float(rSize);
-
-    double dFb = params_.delayFeedback, rDamp = params_.reverbDamp;
-    pair(123, "Delay feedback", dFb, 0.0, 0.85, pct(dFb),
-         126, "Damping", rDamp, 0.0, 1.0, pct(rDamp));
-    params_.delayFeedback = float(dFb); params_.reverbDamp = float(rDamp);
-
-    // ---- output --------------------------------------------------------------
-    section("OUTPUT");
-    const Rect devBox{x, y, w - 92, 34};
-    ui_.dropdown(130, devBox,
-                 sinks_.empty() ? "No output found"
-                                : sinks_[std::min<size_t>(device_, sinks_.size() - 1)].label(),
-                 !sinks_.empty());
-    if (ui_.ghostButton(131, {x + w - 84, y, 84, 34}, "Refresh")) refreshDevices();
-    y += 46;
-
-    const Rect latBox{x, y, w - 130, 34};
-    ui_.dropdown(132, latBox, kLatencies[latency_].label);
-    if (ui_.checkbox(133, {x + w - 120, y, 120, 34}, "Bypass", bypass_)) {
-        params_.enabled = !bypass_;
-        pushParams();
-    }
-    y += 48;
-
-    double gain = params_.outputGain;
-    slider(134, "Output volume", gain, 0.0, 1.5, pct(gain));
-    params_.outputGain = float(gain);
-
-    if (ui_.ghostButton(135, {x, y, w, 36}, "Reset to defaults")) resetSettings();
-    y += 52;
-
-    railHeight_ = y + railScroll_ - r.y;
-    cairo_restore(ui_.cr);
-
-    // Menus paint last so their lists sit above everything, and outside the
-    // clip so a long list is never cut off by the rail.
-    std::vector<std::string> modeNames;
-    for (int i = 0; i < int(Mode::Count); ++i) modeNames.push_back(modeLabel(Mode(i)));
-    int pick = ui_.menuPopup(100, modeBox, modeNames, int(params_.mode));
-    if (pick >= 0) { params_.mode = Mode(pick); preset_ = -1; pushParams(); }
-
-    pick = ui_.menuPopup(101, dirBox, {"Clockwise", "Counter-cw"},
-                         params_.direction >= 0 ? 0 : 1);
-    if (pick >= 0) { params_.direction = pick == 0 ? 1 : -1; pushParams(); }
-
-    std::vector<std::string> charNames;
-    for (int i = 0; i < int(Character::Count); ++i)
-        charNames.push_back(characterLabel(Character(i)));
-    pick = ui_.menuPopup(110, charBox, charNames, int(params_.character));
-    if (pick >= 0) { params_.character = Character(pick); preset_ = -1; pushParams(); }
-
+// The output list drops out of the title bar into the page, so it is painted
+// after the page rather than with the bar that owns it.
+void App::drawSourceMenu() {
+    if (ui_.openMenu != kIdSource || sourcePill_.w <= 0) return;
     std::vector<std::string> devNames;
     for (const auto& s : sinks_) devNames.push_back(s.label());
-    pick = ui_.menuPopup(130, devBox, devNames, device_);
+    const int pick = ui_.menuPopup(kIdSource, sourcePill_, devNames, device_, 300);
     if (pick >= 0) {
         device_ = pick;
         staticDirty_ = true;
         if (engine_.running() && engine_.retarget(sinks_[device_].name))
             setStatus("Output moved to " + sinks_[device_].label() + ".",
                       ui_.theme.good);
-    }
-
-    std::vector<std::string> latNames;
-    for (const auto& l : kLatencies) latNames.push_back(l.label);
-    pick = ui_.menuPopup(132, latBox, latNames, latency_);
-    if (pick >= 0) {
-        latency_ = pick;
-        staticDirty_ = true;
-        if (engine_.running())
-            setStatus("Latency applies the next time you press Start.",
-                      ui_.theme.inkFaint);
     }
 }
 
@@ -683,9 +619,15 @@ void App::loadSettings() {
     params_.reverbSize    = float(num("reverbSize", params_.reverbSize));
     params_.reverbDamp    = float(num("reverbDamp", params_.reverbDamp));
     params_.outputGain    = float(num("outputGain", params_.outputGain));
+    params_.eqBass        = float(num("eqBass", params_.eqBass));
+    params_.eqMid         = float(num("eqMid", params_.eqMid));
+    params_.eqTreble      = float(num("eqTreble", params_.eqTreble));
     latency_ = std::clamp(int(num("latency", kDefaultLatency)), 0,
                           int(sizeof(kLatencies) / sizeof(kLatencies[0])) - 1);
-    dark_ = num("dark", 0) != 0;
+    dark_ = num("dark", 1) != 0;
+    savedScale_ = num("scale", 0);
+    seenWelcome_ = num("seenWelcome", 0) != 0;
+    seenTour_    = num("seenTour", 0) != 0;
     const auto it = kv.find("device");
     if (it != kv.end()) {
         sinks_ = engine_.graph().sinks();
@@ -715,163 +657,104 @@ void App::saveSettings() {
     put("reverbSize", params_.reverbSize);
     put("reverbDamp", params_.reverbDamp);
     put("outputGain", params_.outputGain);
+    put("eqBass", params_.eqBass);
+    put("eqMid", params_.eqMid);
+    put("eqTreble", params_.eqTreble);
     put("latency", latency_);
     put("dark", dark_ ? 1 : 0);
+    if (savedScale_ > 0) put("scale", savedScale_);
+    put("seenWelcome", seenWelcome_ ? 1 : 0);
+    put("seenTour", seenTour_ ? 1 : 0);
     if (device_ >= 0 && device_ < int(sinks_.size())) kv["device"] = sinks_[device_].name;
     writeConfig(kv);
 }
 
-} // namespace eightd
+// --- rendering the design to files ------------------------------------------
 
-namespace eightd {
+bool App::shoot(const std::string& outDir, std::string& error) {
+    registerBundledFonts();
+    // Rendered the way the window actually is: a page with its corners cut
+    // out, sitting on a desktop.
+    frameCorner_ = 16;
+    const int w = int(kDesignW), h = int(kDesignH);
+    cairo_surface_t* surf = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
+    cairo_t* cr = cairo_create(surf);
 
-namespace {
+    // something to sit on, so the shadow has a job
+    cairo_surface_t* desk = cairo_image_surface_create(CAIRO_FORMAT_RGB24, w, h);
+    cairo_t* dcr = cairo_create(desk);
+    cairo_pattern_t* bg = cairo_pattern_create_radial(w * 0.26, h * 0.18, 0,
+                                                      w * 0.26, h * 0.18, w * 0.9);
+    cairo_pattern_add_color_stop_rgb(bg, 0, 0.114, 0.137, 0.157);
+    cairo_pattern_add_color_stop_rgb(bg, 1, 0.047, 0.043, 0.043);
+    cairo_set_source(dcr, bg);
+    cairo_paint(dcr);
+    cairo_pattern_destroy(bg);
+    ui_.theme = dark_ ? Theme::darkTheme() : Theme::light();
 
-std::string clock_(double seconds) {
-    if (seconds < 0 || seconds > 60 * 60 * 24) return "--:--";
-    const long total = long(seconds);
-    char buf[32];
-    if (total >= 3600)
-        std::snprintf(buf, sizeof buf, "%ld:%02ld:%02ld",
-                      total / 3600, (total / 60) % 60, total % 60);
-    else
-        std::snprintf(buf, sizeof buf, "%ld:%02ld", total / 60, total % 60);
-    return buf;
-}
+    // Enough state to make the pages look like the design rather than like a
+    // cold start: a preset chosen, a track, the engine nominally live.
+    applyPreset(1);
+    preset_ = 1;
+    status_.clear();
 
-// Trims to fit, dropping whole UTF-8 characters.  Handing cairo a string cut
-// through a multi-byte character puts the context into a permanent error state
-// and everything drawn after it is silently discarded.
-std::string fitText(const Ui& ui, std::string s, double limit) {
-    if (ui.textWidth(s) <= limit) return s;
-    while (!s.empty()) {
-        while (!s.empty()) {                       // drop one character
-            const unsigned char c = static_cast<unsigned char>(s.back());
-            s.pop_back();
-            if ((c & 0xC0) != 0x80) break;         // that was the lead byte
+    auto shot = [&](const char* name) {
+        ui_.beginFrame();
+        drawChrome(cr, w, h);
+        cairo_surface_flush(surf);
+        // The orbit and the welcome mark are painted live, over the cached
+        // chrome; the shot has to do the same or the page looks half drawn.
+        if (dynamic_.w > 0) {
+            if (welcome_ == 0) {
+                drawWelcomeMark(orbitRect_);
+            } else if (page_ == Page::Studio && welcome_ < 0) {
+                drawOrbitLive(orbitRect_);
+                drawReadout(readoutRect_);
+                drawMeters(metersRect_);
+                if (tour_ >= 0) drawTour({0, 0, double(w), double(h)});
+            }
         }
-        if (ui.textWidth(s + "…") <= limit) break;
-    }
-    return s + "…";
-}
-
-} // namespace
-
-// The panel at the head of the rail: what is playing, and the transport for it.
-double App::drawNowPlaying(const Rect& r, double y) {
-    const double x = r.x + kPad;
-    const double w = r.w - kPad * 2 - 6;
-    const bool have = nowPlaying_.has();
-    const Track t = nowPlaying_.track();
-
-    ui_.font(11, true);
-    ui_.tracked(x, y + 6, "NOW PLAYING", ui_.theme.accentText, 1.8);
-    if (have && !t.player.empty()) {
-        ui_.font(12);
-        ui_.text(x + w, y + 6, t.player, ui_.theme.inkFaint, Align::Right);
-    }
-    y += 30;
-
-    // cover mark
-    const double art = 62;
-    const Rect cover{x, y, art, art};
-    ui_.fillRound(cover, 6, have ? ui_.theme.ink : ui_.theme.field);
-    if (!have) ui_.strokeRound(cover, 6, ui_.theme.line);
-    ui_.font(21, false, true);
-    ui_.text(cover.x + art * 0.5, cover.y + art * 0.5, have ? t.initials() : "—",
-             have ? ui_.theme.chrome : ui_.theme.inkGhost, Align::Centre);
-
-    const double tx = x + art + 16;
-    const double tw = w - art - 16;
-    ui_.font(17, false, true);
-    ui_.text(tx, y + 15, have ? fitText(ui_, t.title, tw) : "Nothing playing",
-             have ? ui_.theme.ink : ui_.theme.inkFaint);
-    ui_.font(13.5);
-    ui_.text(tx, y + 38, have ? fitText(ui_, t.artistLine(), tw)
-                              : "Start a player and it appears here",
-             ui_.theme.inkSoft);
-
-    // progress
-    const double now = std::chrono::duration<double>(
-        std::chrono::steady_clock::now().time_since_epoch()).count();
-    const double pos = have ? t.at(now) : 0.0;
-    const double len = have ? t.length : 0.0;
-    ui_.font(12);
-    const std::string left = have ? clock_(pos) : "--:--";
-    const std::string right = (have && len > 0) ? clock_(len) : "--:--";
-    const double lw = ui_.textWidth(left) + 8, rw = ui_.textWidth(right) + 8;
-    ui_.text(tx, y + 58, left, ui_.theme.inkFaint);
-    ui_.text(x + w, y + 58, right, ui_.theme.inkFaint, Align::Right);
-    const Rect bar{tx + lw, y + 55, tw - lw - rw, 5};
-    if (bar.w > 10) {
-        ui_.fillRound(bar, 2.5, ui_.theme.lineSoft);
-        if (len > 0) {
-            const double frac = std::clamp(pos / len, 0.0, 1.0);
-            if (frac > 0.001)
-                ui_.fillRound({bar.x, bar.y, bar.w * frac, bar.h}, 2.5, ui_.theme.motion);
-            cairo_new_path(ui_.cr);
-            ui_.setColour(ui_.theme.motion);
-            cairo_arc(ui_.cr, bar.x + bar.w * frac, bar.y + 2.5, 5, 0, 2 * M_PI);
-            cairo_fill(ui_.cr);
-        }
-    }
-    y += art + 18;
-
-    // transport, then the Start button
-    const double bs = 38;
-    const bool live = have && !t.bus.empty();
-    auto icon = [&](int id, double bx, int kind, bool enabled) {
-        const Rect b{bx, y, bs, bs};
-        ui_.noteHit(b);
-        const bool over = enabled && b.contains(ui_.mouseX, ui_.mouseY);
-        if (over) ui_.fillRound(b, 8, ui_.theme.accentSoft);
-        const Rgb c = enabled ? (over ? ui_.theme.accentText : ui_.theme.inkSoft)
-                              : ui_.theme.inkGhost;
-        cairo_t* cr = ui_.cr;
-        const double cx = b.x + bs * 0.5, cy = b.y + bs * 0.5;
-        ui_.setColour(c);
-        cairo_new_path(cr);
-        if (kind == 1 || kind == 3) {                 // previous / next
-            // d points the way the triangle travels: left for previous.
-            const double d = kind == 1 ? -1 : 1;
-            cairo_move_to(cr, cx - d * 4.0, cy - 6.5);
-            cairo_line_to(cr, cx - d * 4.0, cy + 6.5);
-            cairo_line_to(cr, cx + d * 6.0, cy);
-            cairo_close_path(cr);
-            cairo_fill(cr);
-            cairo_rectangle(cr, cx + d * 6.0, cy - 6.5, d * 2.2, 13);
-            cairo_fill(cr);
-        } else if (kind == 2) {                        // pause
-            cairo_rectangle(cr, cx - 5.5, cy - 6.5, 3.5, 13);
-            cairo_rectangle(cr, cx + 2.0, cy - 6.5, 3.5, 13);
-            cairo_fill(cr);
-        } else {                                       // play
-            cairo_move_to(cr, cx - 4.5, cy - 6.5);
-            cairo_line_to(cr, cx - 4.5, cy + 6.5);
-            cairo_line_to(cr, cx + 6.5, cy);
-            cairo_close_path(cr);
-            cairo_fill(cr);
-        }
-        bool clicked = false;
-        if (over && ui_.mousePressed) ui_.active = id;
-        if (over && ui_.mouseReleased && ui_.active == id) clicked = true;
-        return clicked;
+        cairo_surface_flush(surf);
+        // lay the window on the desktop and write that
+        cairo_surface_t* out = cairo_image_surface_create(CAIRO_FORMAT_RGB24, w, h);
+        cairo_t* ocr = cairo_create(out);
+        cairo_set_source_surface(ocr, desk, 0, 0);
+        cairo_paint(ocr);
+        cairo_set_source_surface(ocr, surf, 0, 0);
+        cairo_paint(ocr);
+        cairo_surface_flush(out);
+        const std::string path = outDir + "/" + name + ".png";
+        cairo_surface_write_to_png(out, path.c_str());
+        cairo_destroy(ocr);
+        cairo_surface_destroy(out);
+        ui_.endFrame();
     };
 
-    if (icon(200, x, 1, live && t.canPrev)) nowPlaying_.previous();
-    if (icon(201, x + bs + 6, t.playing ? 2 : 0, live)) nowPlaying_.playPause();
-    if (icon(202, x + (bs + 6) * 2, 3, live && t.canNext)) nowPlaying_.next();
+    welcome_ = -1; tour_ = -1;
+    page_ = Page::Studio;  shot("studio");
+    page_ = Page::About;   shot("about");
+    page_ = Page::Account; shot("account");
+    page_ = Page::Studio;
+    for (int i = 0; i < 5; ++i) { welcome_ = i; shot(("welcome" + std::to_string(i + 1)).c_str()); }
+    welcome_ = -1;
+    for (int i = 0; i < 7; ++i) { tour_ = i; shot(("tour" + std::to_string(i + 1)).c_str()); }
+    tour_ = -1;
+    page_ = Page::About;
+    for (int i = 0; i < 4; ++i) { guide_ = i; shot(("guide" + std::to_string(i + 1)).c_str()); }
+    guide_ = -1;
 
-    const double startW = 132;
-    const Rect start{x + w - startW, y, startW, bs};
-    const bool running = engine_.running();
-    if (ui_.button(203, start, running ? "Stop" : "Start",
-                   running ? ui_.theme.motion : ui_.theme.accent,
-                   running ? ui_.theme.onMotion : ui_.theme.onAccent,
-                   !sinks_.empty(), 8))
-        startStop();
+    // and the same page in daylight
+    ui_.theme = Theme::light();
+    dark_ = false;
+    page_ = Page::Studio; shot("studio-light");
+    page_ = Page::About;  shot("about-light");
 
-    return y + bs + 10;
+    cairo_destroy(cr);
+    cairo_surface_destroy(surf);
+    cairo_destroy(dcr);
+    cairo_surface_destroy(desk);
+    (void)error;
+    return true;
 }
 
 } // namespace eightd

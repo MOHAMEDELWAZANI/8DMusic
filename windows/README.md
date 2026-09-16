@@ -85,12 +85,46 @@ Until that installer exists, the DLL builds and registers but will not be in the
 audio path, and `8DMusic.exe` will honestly report `WAITING` rather than
 pretend otherwise.
 
+## The window
+
+`8DMusic.exe` is a control surface and nothing else: it writes parameters into
+the shared block and draws what the telemetry says the orbit is doing. Changing
+how it looks touches neither `src/apo` nor `src/shared`, which is why the
+interface could be replaced without going near the audio path.
+
+It is now the same page as the Linux build's v2 Studio — see
+`cpp/src/ui/Studio.cpp`, which `src/gui/Main.cpp` mirrors function for function:
+
+* the orbit on a lit floor with its readout, the meters and the preset chips on
+  the left;
+* Movement, Space and Echo in one column of cards, Character, Equaliser and
+  Endpoint in the other;
+* knobs you **turn** — grab one anywhere and move around it, whole-step values,
+  a dot at the head of the arc — and Character's Amount as a slider;
+* the media session floating across the foot of the window;
+* the app's own title bar, because the window wears no decoration: minimise and
+  close at the trailing edge, and any empty part of the bar drags it.
+
+Where the Linux build has an ENGINE card with a Start button, Windows has
+ENDPOINT: there is nothing to start, only somewhere to be. It shows the output,
+whether the APO is in the path, and why not when it is not.
+
+Three files carry the shared design rather than a copy of it:
+`cpp/src/ui/Theme.h` for the colours, `cpp/src/ui/Icons.h` for the glyphs (path
+data with no drawing library behind it) and `cpp/src/dsp/Params.h` for the
+presets. `src/gui/Path.h` draws that path data with GDI+, as `Path.h` does with
+cairo on Linux.
+
+The interface is drawn in Figtree when `Figtree.ttf` sits beside the exe, in
+`assets\fonts\` under it, or in the source tree — the same file the Linux build
+loads. Without it Segoe UI takes over and everything still lays out.
+
 ## Status
 
 Written, not yet compiled. There is no Windows machine, MSVC or Windows SDK on
-the development host, so unlike the Android build — which was tested on real
-hardware — none of this has been through a compiler. Expect build errors on the
-first pass.
+the development host, so unlike the Android and Linux builds — which were both
+tested on real hardware — none of this has been through a compiler. Expect
+build errors on the first pass.
 
 ## The alternative worth considering
 

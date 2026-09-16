@@ -43,6 +43,10 @@ data class Palette(
     val statusOff: Color,
     val panel: Color,
     val panelSoft: Color,
+    /** v2 surfaces: ground -> card -> well -> raised, no outlines. */
+    val card: Color,
+    val well: Color,
+    val raised: Color,
 ) {
     companion object {
         val Paper = Palette(
@@ -76,11 +80,14 @@ data class Palette(
             statusOff = Color(0xFF7D7979),
             panel = Color(0xFFEAE9E9),
             panelSoft = Color(0xFFF8F4F4),
+            card = Color(0xFFFFFFFF),
+            well = Color(0xFFEDEBEB),
+            raised = Color(0xFFDAD6D6),
         )
 
         val Ink = Palette(
             dark = true,
-            ground = Color(0xFF1A1918),
+            ground = Color(0xFF161514),
             text = Color(0xFFF3F2F2),
             dim = Color(0xFFBAB6B6),
             faint = Color(0xFF9B9797),
@@ -109,6 +116,9 @@ data class Palette(
             statusOff = Color(0xFF9B9797),
             panel = Color(0xFF262423),
             panelSoft = Color(0xFF221F1E),
+            card = Color(0xFF211F1E),
+            well = Color(0xFF2B2927),
+            raised = Color(0xFF46423F),
         )
     }
 }

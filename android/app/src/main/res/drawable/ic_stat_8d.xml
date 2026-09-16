@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar mark: the four bars alone, which is all that survives at 24dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512"
+    android:tint="#FFFFFF">
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M148,222 A22,22 0 0 1 192,222 V300 A22,22 0 0 1 148,300 Z" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M211,165 A22,22 0 0 1 255,165 V300 A22,22 0 0 1 211,300 Z" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M274,197 A22,22 0 0 1 318,197 V300 A22,22 0 0 1 274,300 Z" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M339,250 A22,22 0 0 1 383,250 V300 A22,22 0 0 1 339,300 Z" />
+</vector>

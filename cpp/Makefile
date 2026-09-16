@@ -2,8 +2,8 @@
 #
 # Needs the PipeWire, cairo and X11 development files:
 #     sudo apt install build-essential pkg-config \
-#                      libpipewire-0.3-dev libcairo2-dev libx11-dev \
-#                      libpango1.0-dev libsystemd-dev
+#                      libpipewire-0.3-dev libcairo2-dev libx11-dev libxext-dev \
+#                      libpango1.0-dev libfontconfig1-dev libsystemd-dev
 #
 # If they are installed somewhere else, point EIGHTD_SDK at a prefix holding
 # usr/include and usr/lib (the layout `dpkg -x` produces) and the build will
@@ -16,7 +16,8 @@ LDFLAGS  ?=
 
 BIN      := 8dmusic
 BUILD    := build
-SRC      := src/main.cpp src/ui/App.cpp src/ui/Window.cpp \
+SRC      := src/main.cpp src/ui/App.cpp src/ui/Studio.cpp src/ui/Pages.cpp \
+            src/ui/Tour.cpp src/ui/Window.cpp \
             src/audio/Engine.cpp src/audio/Graph.cpp src/audio/NowPlaying.cpp \
             src/dsp/Processor.cpp
 OBJ      := $(patsubst src/%.cpp,$(BUILD)/%.o,$(SRC))
@@ -30,14 +31,15 @@ ifdef EIGHTD_SDK
              -I$(EIGHTD_SDK)/usr/include/freetype2 \
              -I$(EIGHTD_SDK)/usr/include/pango-1.0 \
              -I$(EIGHTD_SDK)/usr/include/harfbuzz \
+             -I$(EIGHTD_SDK)/usr/include/fontconfig \
              -I$(EIGHTD_SDK)/usr/include/glib-2.0 \
              -I$(EIGHTD_SDK)/usr/lib/$(ARCH)/glib-2.0/include \
              -I$(EIGHTD_SDK)/usr/include
   LIBS    := -L$(EIGHTD_SDK)/usr/lib/$(ARCH) -lpipewire-0.3 -lcairo -lX11 \
              -lpangocairo-1.0 -lpango-1.0 -lgobject-2.0 -lglib-2.0 \
-             -lsystemd -lpthread -lm
+             -lfontconfig -lXext -lsystemd -lpthread -lm
 else
-  PKGS    := libpipewire-0.3 cairo x11 pangocairo libsystemd
+  PKGS    := libpipewire-0.3 cairo x11 xext pangocairo fontconfig libsystemd
   INCS    := $(shell pkg-config --cflags $(PKGS))
   LIBS    := $(shell pkg-config --libs $(PKGS)) -lpthread -lm
 endif
@@ -60,7 +62,8 @@ check: $(BIN)
 
 deps:
 	sudo apt install build-essential pkg-config libpipewire-0.3-dev \
-	                 libcairo2-dev libx11-dev libpango1.0-dev libsystemd-dev
+	                 libcairo2-dev libx11-dev libxext-dev libpango1.0-dev \
+	                 libfontconfig1-dev libsystemd-dev
 
 clean:
 	rm -rf $(BUILD) $(BIN)

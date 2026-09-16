@@ -1,7 +1,10 @@
-// Colour tokens.  Both themes are built from the handful of colours a theme
-// really has, so a change to one ground colour ripples through consistently.
+// Colour tokens for the v2 interface.
+//
+// The names come straight from the design: a ground the window sits on, cards
+// raised off it, wells sunk into the cards, and one accent plus one motion
+// colour used sparingly.  Both themes fill the same slots, so nothing below
+// this file ever asks which theme is running.
 #pragma once
-#include <string>
 #include <cstdint>
 #include <cmath>
 
@@ -19,59 +22,64 @@ inline Rgb mix(Rgb a, Rgb b, double t) {
 }
 
 struct Theme {
-    bool dark = false;
-    Rgb ground, chrome, rail, field, line, lineSoft;
-    Rgb ink, inkSoft, inkFaint, inkGhost;
-    Rgb accent, accentText, accentSoft, onAccent;
-    Rgb motion, motionText, onMotion;
+    bool dark = true;
+
+    // surfaces, darkest to lightest
+    Rgb ground, card, well, raised, line;
+    // type, strongest to weakest
+    Rgb text, dim, faint, ghost;
+    // the two colours that carry meaning
+    Rgb accent, deep, tint, onAccent;
+    Rgb motion, onMotion;
+    // states
     Rgb good, warn;
 
-    static Theme light() {
-        Theme t;
-        t.dark = false;
-        t.ground   = Rgb::hex(0xF2F2F0);
-        t.chrome   = Rgb::hex(0xFFFFFF);
-        t.rail     = Rgb::hex(0xF7F7F5);
-        t.field    = Rgb::hex(0xFFFFFF);
-        t.line     = Rgb::hex(0xD8D8D4);
-        t.lineSoft = Rgb::hex(0xE7E7E3);
-        t.ink      = Rgb::hex(0x16181C);
-        t.inkSoft  = Rgb::hex(0x5B6068);
-        t.inkFaint = Rgb::hex(0x8A8F98);
-        t.inkGhost = Rgb::hex(0xB4B8BF);
-        t.accent     = Rgb::hex(0x0E7FA8);
-        t.accentText = Rgb::hex(0x0E7FA8);
-        t.accentSoft = Rgb::hex(0xE3F0F6);
-        t.onAccent   = Rgb::hex(0xFFFFFF);
-        t.motion     = Rgb::hex(0xE8225F);
-        t.motionText = Rgb::hex(0xC01A4E);
-        t.onMotion   = Rgb::hex(0xFFFFFF);
-        t.good = Rgb::hex(0x1C9E63);
-        t.warn = Rgb::hex(0xD08A16);
-        return t;
-    }
     static Theme darkTheme() {
         Theme t;
-        t.dark = true;
-        t.ground   = Rgb::hex(0x0B0C0E);
-        t.chrome   = Rgb::hex(0x121417);
-        t.rail     = Rgb::hex(0x101215);
-        t.field    = Rgb::hex(0x1A1D22);
-        t.line     = Rgb::hex(0x2A2E35);
-        t.lineSoft = Rgb::hex(0x1E2228);
-        t.ink      = Rgb::hex(0xEDEFF2);
-        t.inkSoft  = Rgb::hex(0x9AA1AC);
-        t.inkFaint = Rgb::hex(0x6F7681);
-        t.inkGhost = Rgb::hex(0x4A505A);
-        t.accent     = Rgb::hex(0x4FC3F7);
-        t.accentText = Rgb::hex(0x4FC3F7);
-        t.accentSoft = Rgb::hex(0x16303C);
-        t.onAccent   = Rgb::hex(0x04202B);
-        t.motion     = Rgb::hex(0xFF4D8D);
-        t.motionText = Rgb::hex(0xFF6FA3);
-        t.onMotion   = Rgb::hex(0x2B0715);
+        t.dark   = true;
+        t.ground = Rgb::hex(0x161514);
+        t.card   = Rgb::hex(0x211F1E);
+        t.well   = Rgb::hex(0x2B2927);
+        t.raised = Rgb::hex(0x46423F);
+        t.line   = Rgb::hex(0x3A3735);
+        t.text   = Rgb::hex(0xF3F2F2);
+        t.dim    = Rgb::hex(0xBAB6B6);
+        t.faint  = Rgb::hex(0x9B9797);
+        t.ghost  = Rgb::hex(0x6B6766);
+        t.accent = Rgb::hex(0x62C5EE);
+        t.deep   = Rgb::hex(0x99E0FF);
+        t.tint   = Rgb::hex(0x0E3342);
+        t.onAccent = Rgb::hex(0x08222D);
+        t.motion   = Rgb::hex(0xFF458E);
+        t.onMotion = Rgb::hex(0x3D0A1F);
         t.good = Rgb::hex(0x35D08A);
         t.warn = Rgb::hex(0xE8A73C);
+        return t;
+    }
+
+    // The same interface in daylight.  The ladder is inverted -- cards sit
+    // above the ground rather than below it -- so every card, well and tile in
+    // the layout keeps working without a single special case.
+    static Theme light() {
+        Theme t;
+        t.dark   = false;
+        t.ground = Rgb::hex(0xEFEDEA);
+        t.card   = Rgb::hex(0xFFFFFF);
+        t.well   = Rgb::hex(0xF1EEEB);
+        t.raised = Rgb::hex(0xDFDAD5);
+        t.line   = Rgb::hex(0xDDD8D3);
+        t.text   = Rgb::hex(0x1A1817);
+        t.dim    = Rgb::hex(0x56514D);
+        t.faint  = Rgb::hex(0x7C7671);
+        t.ghost  = Rgb::hex(0xA8A29C);
+        t.accent = Rgb::hex(0x0E7FA8);
+        t.deep   = Rgb::hex(0x0A5E7D);
+        t.tint   = Rgb::hex(0xDCEEF6);
+        t.onAccent = Rgb::hex(0xFFFFFF);
+        t.motion   = Rgb::hex(0xD81B60);
+        t.onMotion = Rgb::hex(0xFFFFFF);
+        t.good = Rgb::hex(0x1C9E63);
+        t.warn = Rgb::hex(0xB97A0F);
         return t;
     }
 };

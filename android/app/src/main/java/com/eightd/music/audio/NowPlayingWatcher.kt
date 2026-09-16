@@ -76,6 +76,28 @@ class NowPlayingWatcher(private val context: Context) {
         )
     }
 
+    /** One other app with a media session right now. */
+    data class AppSound(val packageName: String, val playing: Boolean)
+
+    /**
+     * Which apps are making sound, straight from MediaSessionManager.
+     *
+     * This is the same list Android uses for the media controls in the shade,
+     * so it is honest about its limits: apps that publish no session (Discord,
+     * most games) are audible but invisible here, exactly as the guide says.
+     */
+    fun activeApps(): List<AppSound> {
+        if (!hasAccess()) return emptyList()
+        val active = runCatching {
+            context.getSystemService(MediaSessionManager::class.java)
+                .getActiveSessions(component)
+        }.getOrNull().orEmpty()
+        return active
+            .filter { it.packageName != context.packageName }
+            .distinctBy { it.packageName }
+            .map { AppSound(it.packageName, it.playbackState?.state == PlaybackState.STATE_PLAYING) }
+    }
+
     /** The transport drives the player itself, not the effect. */
     fun playPause() = controller?.transportControls?.let {
         if (controller?.playbackState?.state == PlaybackState.STATE_PLAYING) it.pause() else it.play()

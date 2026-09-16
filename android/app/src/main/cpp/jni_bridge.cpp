@@ -184,7 +184,7 @@ public:
     }
 
     int32_t rate() const { return rate_; }
-    uint32_t frames() const { return frames_; }
+    uint32_t frames() const { return ready32_.load(std::memory_order_acquire); }
 
     // Decoded PCM arrives here as interleaved 16-bit at the file's own rate.
     //
@@ -198,13 +198,18 @@ public:
         srcChannels_ = channels < 1 ? 1 : channels;
         ratio_ = double(rate_) / double(srcRate_);
         const size_t cap = size_t(double(estFrames) * ratio_) + 4096;
+        // Publish "nothing to read" before the memory moves: the audio thread
+        // never locks, so it must never be pointed at a buffer being replaced.
+        ready32_.store(0, std::memory_order_release);
+        retire(std::move(pcm_));
         pcm_.assign(cap * 2, 0.f);
+        data_.store(pcm_.data(), std::memory_order_release);
         frames_ = 0;
         ready_ = 0;
         srcPhase_ = 0.0;
         carry_.clear();
         pos_.store(0, std::memory_order_relaxed);
-        complete_ = false;
+        complete_.store(false, std::memory_order_release);
         proc_.reset();
     }
 
@@ -261,11 +266,11 @@ public:
 
     void endSource() {
         std::lock_guard<std::mutex> lk(srcMutex_);
-        complete_ = true;
+        complete_.store(true, std::memory_order_release);
     }
 
-    uint32_t readyFrames() const { return ready_; }
-    bool sourceComplete() const { return complete_; }
+    uint32_t readyFrames() const { return ready32_.load(std::memory_order_acquire); }
+    bool sourceComplete() const { return complete_.load(std::memory_order_acquire); }
 
     // Direct capture: the source is a live stream, not a decoded file.
     void setLive(bool on) {
@@ -287,7 +292,8 @@ public:
     }
 
     void seek(uint32_t frame) {
-        pos_.store(std::min(frame, frames_), std::memory_order_relaxed);
+        pos_.store(std::min(frame, ready32_.load(std::memory_order_acquire)),
+                   std::memory_order_relaxed);
     }
     uint32_t position() const { return pos_.load(std::memory_order_relaxed); }
     void setLoop(bool on) { loop_.store(on, std::memory_order_relaxed); }
@@ -305,10 +311,30 @@ private:
     void appendFrames(const float* src, size_t n) {
         if (n == 0) return;
         const size_t cap = pcm_.size() / 2;
-        if (ready_ + n > cap) pcm_.resize((ready_ + n + 4096) * 2, 0.f);
+        if (ready_ + n > cap) {
+            // Grow by copying into a fresh buffer and publishing that, rather
+            // than resize()-ing the one the audio thread is reading from.
+            // Thirty seconds of headroom keeps this rare: it only happens when
+            // the file's own duration metadata was short or missing.
+            const size_t want = (ready_ + n + size_t(rate_) * 30) * 2;
+            std::vector<float> grown(want, 0.f);
+            std::memcpy(grown.data(), pcm_.data(), ready_ * 2 * sizeof(float));
+            retire(std::move(pcm_));
+            pcm_ = std::move(grown);
+            data_.store(pcm_.data(), std::memory_order_release);
+        }
         std::memcpy(&pcm_[ready_ * 2], src, n * 2 * sizeof(float));
         ready_ += n;
         frames_ = uint32_t(ready_);
+        ready32_.store(uint32_t(ready_), std::memory_order_release);
+    }
+
+    // Buffers the audio thread may still be reading from. Freed a couple of
+    // generations later, by which time it has long moved on.
+    void retire(std::vector<float>&& old) {
+        if (old.empty()) return;
+        retired_.push_back(std::move(old));
+        if (retired_.size() > 2) retired_.erase(retired_.begin());
     }
 
     static aaudio_data_callback_result_t onData(AAudioStream*, void* user, void* audio, int32_t n) {
@@ -340,8 +366,13 @@ private:
             return AAUDIO_CALLBACK_RESULT_CONTINUE;
         }
 
-        std::unique_lock<std::mutex> src(srcMutex_, std::try_to_lock);
-        if (!src.owns_lock() || frames_ == 0) {
+        // Lock-free: the decoder publishes a buffer pointer and a frame count,
+        // and the audio thread only ever reads them. Taking the decoder's lock
+        // here used to drop whole blocks to silence while a track was being
+        // appended, which is the crackle you heard at the start of a song.
+        const float* buf = data_.load(std::memory_order_acquire);
+        const uint32_t have = ready32_.load(std::memory_order_acquire);
+        if (buf == nullptr || have == 0) {
             std::memset(out, 0, size_t(n) * 2 * sizeof(float));
             return AAUDIO_CALLBACK_RESULT_CONTINUE;
         }
@@ -351,10 +382,10 @@ private:
             float* dst = out + size_t(done) * 2;
 
             uint32_t pos = pos_.load(std::memory_order_relaxed);
-            const uint32_t avail = (pos < frames_) ? std::min(block, frames_ - pos) : 0;
+            const uint32_t avail = (pos < have) ? std::min(block, have - pos) : 0;
 
             if (avail)
-                std::memcpy(dst, &pcm_[size_t(pos) * 2], size_t(avail) * 2 * sizeof(float));
+                std::memcpy(dst, buf + size_t(pos) * 2, size_t(avail) * 2 * sizeof(float));
             if (avail < block)
                 std::memset(dst + size_t(avail) * 2, 0,
                             size_t(block - avail) * 2 * sizeof(float));
@@ -363,7 +394,8 @@ private:
             proc_.process(dst, dst, block, current_);
 
             pos += avail;
-            if (complete_ && pos >= frames_ && loop_.load(std::memory_order_relaxed))
+            if (complete_.load(std::memory_order_acquire) && pos >= have &&
+                loop_.load(std::memory_order_relaxed))
                 pos = 0;
             pos_.store(pos, std::memory_order_relaxed);
 
@@ -379,11 +411,15 @@ private:
 
     mutable std::mutex srcMutex_;
     std::vector<float> pcm_;
+    std::vector<std::vector<float>> retired_;
     std::vector<float> carry_;
     size_t ready_ = 0;
+    // What the audio thread reads: published by the decoder, never locked.
+    std::atomic<const float*> data_{nullptr};
+    std::atomic<uint32_t> ready32_{0};
     double ratio_ = 1.0, srcPhase_ = 0.0;
     int32_t srcRate_ = 48000, srcChannels_ = 2;
-    bool complete_ = false;
+    std::atomic<bool> complete_{false};
     uint32_t frames_ = 0;
     std::atomic<uint32_t> pos_{0};
     std::atomic<bool> loop_{true};

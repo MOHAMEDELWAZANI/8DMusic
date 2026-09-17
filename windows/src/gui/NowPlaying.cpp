@@ -173,7 +173,23 @@ void NowPlaying::run() {
                 const double posS   = std::chrono::duration<double>(tl.Position()).count();
                 t.length   = std::max(0.0, endS - startS);
                 t.position = std::max(0.0, posS - startS);
-                t.stamp    = monotonic();
+
+                // Position is a reading, not a clock, and LastUpdatedTime says
+                // when it was taken. Chromium takes one and then stops: Brave
+                // sat at 68.33 s for three minutes of a playing track while
+                // LastUpdatedTime aged past 195 s.
+                //
+                // Stamping it with "now" every poll -- which is what this used
+                // to do -- restarts the extrapolation twice a second, so the
+                // bar froze at whatever second the player last bothered to
+                // report. Dating the reading properly makes it run again, and
+                // costs nothing when a player does keep its position current,
+                // because then the age is simply near zero.
+                double age = std::chrono::duration<double>(
+                    winrt::clock::now() - tl.LastUpdatedTime()).count();
+                if (!(age > 0.0)) age = 0.0;            // also catches NaN
+                if (t.length > 0.0) age = std::min(age, t.length);
+                t.stamp = monotonic() - age;
 
                 t.player = tidyAppId(std::wstring(session.SourceAppUserModelId().c_str()));
                 found = t.known();

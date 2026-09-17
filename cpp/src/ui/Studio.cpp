@@ -68,6 +68,19 @@ const Icon& characterGlyph(Character c) {
     }
 }
 
+// Where a peak sits on the bar.
+//
+// The peak itself is a plain amplitude, and a bar drawn straight from it reads
+// as broken: music mixed to peak at -20 dBFS would fill a tenth of it and never
+// appear to move.  Meters are read in decibels for that reason, so this is a
+// 60 dB scale -- silence at the left, full scale at the right, and ordinary
+// listening in the top third where it can actually be seen.
+double meterScale(double peak) {
+    if (peak <= 1e-4) return 0.0;
+    const double db = 20.0 * std::log10(peak);
+    return std::clamp((db + 60.0) / 60.0, 0.0, 1.0);
+}
+
 // Where the sound is, in words.
 std::string bearing(double deg) {
     const char* side = deg > 8 ? "right" : (deg < -8 ? "left" : "centre");
@@ -129,11 +142,12 @@ void App::drawStage(const Rect& r) {
         }
     }
 
-    // readout on the left, meters on the right, both live
+    // The readout and the meters move, so they belong to the live pass and are
+    // deliberately not painted here: drawn into the cached chrome as well, the
+    // old reading would still be sitting under the new one.  Only their places
+    // are settled here.
     readoutRect_ = {x, y + 10, w - 144, 20};
     metersRect_  = {x + w - 130, y + 10, 130, 20};
-    drawReadout(readoutRect_);
-    drawMeters(metersRect_);
     y += 30;
 
     // everything that animates sits inside this strip
@@ -200,7 +214,7 @@ void App::drawMeters(const Rect& r) {
         ui_.text(r.x, ly, names[i], ui_.theme.ghost);
         const Rect track{r.x + 12, ly - 2, r.w - 12, 4};
         ui_.fillRound(track, kPill, ui_.theme.well);
-        const double t = std::clamp(vals[i], 0.0, 1.0);
+        const double t = meterScale(vals[i]);
         if (t > 0.002)
             ui_.fillRound({track.x, track.y, track.w * t, track.h}, kPill,
                           t < 0.9 ? ui_.theme.accent : ui_.theme.motion);
@@ -620,9 +634,16 @@ double App::drawNowPlaying(const Rect& dock) {
             cairo_pattern_destroy(p);
         }
     }
-    ui_.font(17, W700);
-    ui_.text(cover.cx(), cover.cy(), have ? t.initials() : "—",
-             have ? Rgb::hex(0xFFFFFF) : ui_.theme.ghost, Align::Centre);
+    // The mark is set in the face that can draw it: Pixelify Sans for Latin,
+    // KO Methlama for Arabic ones.  Arabic letters sit shorter on the line than
+    // Latin at the same size, so the size follows the script as well.  The lead
+    // bytes D8..DB are exactly U+0600..U+06FF in UTF-8.
+    const std::string mark = have ? t.initials() : "—";
+    bool arabicMark = false;
+    for (unsigned char c : mark) if (c >= 0xD8 && c <= 0xDB) arabicMark = true;
+    ui_.font(arabicMark ? 20 : 19, W700, ui_.mark);
+    ui_.markText(cover.cx(), cover.cy(), mark,
+                 have ? Rgb::hex(0xFFFFFF) : ui_.theme.ghost);
 
     // transport, at the far end
     const double bs = 40, small = 34;

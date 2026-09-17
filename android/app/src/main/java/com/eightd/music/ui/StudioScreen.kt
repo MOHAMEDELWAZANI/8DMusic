@@ -457,6 +457,22 @@ private fun ReadoutV2(angle: Float, distance: Float, peakL: Float, peakR: Float,
     }
 }
 
+/**
+ * Where a peak sits on the bar.
+ *
+ * The peak itself is a plain amplitude, and a bar drawn straight from it reads
+ * as broken: music mixed to peak at -20 dBFS would fill a tenth of it and never
+ * appear to move. Meters are read in decibels for that reason, so this is a
+ * 60 dB scale — silence at the left, full scale at the right, and ordinary
+ * listening in the top third where it can actually be seen. The same scale as
+ * the desktop and Windows builds.
+ */
+private fun meterScale(peak: Float): Float {
+    if (peak <= 1e-4f) return 0f
+    val db = 20f * kotlin.math.log10(peak)
+    return ((db + 60f) / 60f).coerceIn(0f, 1f)
+}
+
 @Composable
 private fun MeterV2(label: String, level: Float, running: Boolean) {
     val p = palette
@@ -467,7 +483,7 @@ private fun MeterV2(label: String, level: Float, running: Boolean) {
             val h = size.height
             drawRoundRect(p.well, size = size,
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2))
-            val w = kotlin.math.sqrt(level.coerceIn(0f, 1f)) * size.width
+            val w = meterScale(level) * size.width
             if (w > 1f) drawRoundRect(
                 if (running) p.accent else p.meterOff,
                 size = Size(w, h),

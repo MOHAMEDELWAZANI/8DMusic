@@ -131,7 +131,7 @@ private fun TrackRow(track: Track, playing: Boolean, onPlay: () -> Unit) {
         Box(
             Modifier.size(52.dp).background(p.well, RoundedCornerShape(14.dp)),
             contentAlignment = Alignment.Center,
-        ) { T(track.title.take(2), 15.sp, p.dim, FontWeight.SemiBold) }
+        ) { Mark(track.title.take(2), 15.sp, p.dim) }
         Column(Modifier.weight(1f)) {
             T(track.title, 16.sp, if (playing) p.accent else p.text, FontWeight.SemiBold,
                 maxLines = 1)

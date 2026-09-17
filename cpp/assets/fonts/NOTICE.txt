@@ -1,0 +1,25 @@
+Typefaces bundled with 8D Music
+===============================
+
+Figtree.ttf
+    SIL Open Font License 1.1 -- see OFL-Figtree.txt.
+    Used for the whole interface.
+
+PixelifySans-Bold.ttf
+    SIL Open Font License 1.1 -- see OFL-PixelifySans.txt.
+    Copyright 2021 The Pixelify Sans Project Authors.
+    https://github.com/eifetx/Pixelify-Sans
+    Used for the Latin initials on the now-playing cover mark.
+    Cut from the variable original at weight 700, so nothing here depends on
+    variable-axis support: GDI on Windows has none.
+
+KOMethlama-Medium.otf
+    "Copyright (c) 2025 by HEY PORTER! / Tawfiq Dawi."
+    Distributed by arfonts.net as free for personal and commercial use:
+    https://www.arfonts.net/ko-methlama-medium-font
+    Used for Arabic -- the cover mark's initials and any Arabic text in the
+    interface, neither of which Figtree or Pixelify Sans can set.
+
+The two mark faces cover disjoint alphabets: Pixelify Sans has all 52 Latin
+letters and no Arabic, KO Methlama has 112 Arabic letters and no Latin.  That is
+why they can sit in one family list and let the text renderer choose per word.

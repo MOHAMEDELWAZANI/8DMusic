@@ -55,8 +55,19 @@ public:
 
     // The families, in order of preference.  Figtree ships with the app; the
     // rest are what a Linux desktop is likely to have if it is missing.
-    std::string sans = "Figtree, Inter, Lato, DejaVu Sans, sans-serif";
+    //
+    // KO Methlama sits in the list because Figtree has no Arabic and neither
+    // does Inter or Lato: an Arabic title would otherwise land in whatever
+    // fontconfig picked.  Pango falls back a run at a time, so the Latin words
+    // still come out of Figtree and only the Arabic ones reach Methlama.
+    std::string sans = "Figtree, Inter, Lato, KO Methlama, DejaVu Sans, sans-serif";
     std::string serif = "Noto Serif, DejaVu Serif, serif";
+
+    // The cover mark, in the two faces the design chose.  They cover disjoint
+    // alphabets -- Pixelify Sans has every Latin letter and no Arabic, Methlama
+    // the reverse -- so one list is enough: the face follows the title, without
+    // anything here having to work out which script it is written in.
+    std::string mark = "Pixelify Sans, KO Methlama, Figtree, sans-serif";
 
     Ui() = default;
     Ui(const Ui&) = delete;
@@ -182,8 +193,13 @@ public:
     }
 
     void font(double size, int weight = W400, bool serifFace = false) const {
+        font(size, weight, serifFace ? serif : sans);
+    }
+
+    // The same, against a named family list rather than one of the two defaults.
+    void font(double size, int weight, const std::string& family) const {
         if (!desc_ || !layout_) return;
-        pango_font_description_set_family(desc_, serifFace ? serif.c_str() : sans.c_str());
+        pango_font_description_set_family(desc_, family.c_str());
         pango_font_description_set_weight(desc_, PangoWeight(weight));
         pango_font_description_set_absolute_size(desc_, size * PANGO_SCALE);
         pango_layout_set_font_description(layout_, desc_);
@@ -220,6 +236,28 @@ public:
         else if (align == Align::Right) tx = x - w;
         setColour(c, alpha);
         cairo_move_to(cr, tx, y - h * 0.5);
+        pango_cairo_show_layout(cr, layout_);
+    }
+
+    // The cover mark, centred on the ink rather than on the line box.  The two
+    // mark faces have very different vertical metrics -- Methlama leaves room
+    // below the baseline for tails that Pixelify has no use for -- so centring
+    // the line would put one of the two off the middle of the tile.
+    void markText(double cx, double cy, const std::string& s, const Rgb& c,
+                  double alpha = 1.0) const {
+        if (!layout_) return;
+        pango_layout_set_attributes(layout_, nullptr);
+        pango_layout_set_width(layout_, -1);
+        pango_layout_set_text(layout_, s.c_str(), -1);
+        PangoRectangle ink{}, logical{};
+        pango_layout_get_pixel_extents(layout_, &ink, &logical);
+        if (ink.width <= 0 || ink.height <= 0) {
+            text(cx, cy, s, c, Align::Centre, alpha);     // nothing to centre on
+            return;
+        }
+        setColour(c, alpha);
+        cairo_move_to(cr, cx - ink.x - ink.width * 0.5,
+                          cy - ink.y - ink.height * 0.5);
         pango_cairo_show_layout(cr, layout_);
     }
 

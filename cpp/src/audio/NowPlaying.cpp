@@ -321,6 +321,12 @@ void NowPlaying::setCapturedApps(std::vector<std::string> apps) {
     capturedApps_ = std::move(apps);
 }
 
+void NowPlaying::poseTrack(Track t) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    track_ = std::move(t);
+    has_ = true;
+}
+
 void NowPlaying::previous()  { std::lock_guard<std::mutex> l(cmdMutex_); commands_.push_back({track().bus, "Previous"}); }
 void NowPlaying::playPause() { std::lock_guard<std::mutex> l(cmdMutex_); commands_.push_back({track().bus, "PlayPause"}); }
 void NowPlaying::next()      { std::lock_guard<std::mutex> l(cmdMutex_); commands_.push_back({track().bus, "Next"}); }

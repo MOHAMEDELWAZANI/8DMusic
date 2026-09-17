@@ -80,7 +80,7 @@ fun Cover(track: Track?, size: Dp, corner: Dp, px: Int = 256) {
                 modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(corner)),
             )
         } else if (track != null) {
-            T(track.title.take(2), (size.value / 3.4f).sp, p.dim, FontWeight.Bold)
+            Mark(track.title.take(2), (size.value / 3.4f).sp, p.dim)
         }
     }
 }

@@ -17,6 +17,7 @@
 // come from Params.h.
 #include <windows.h>
 #include <windowsx.h>
+#include <shellapi.h>
 #include <objidl.h>
 #include <gdiplus.h>
 #include <mmdeviceapi.h>
@@ -54,7 +55,13 @@ constexpr double kCardPad = 14, kSechH = 24, kKnobBlock = 82, kTileH = 58;
 constexpr double kCardR = 22, kOrbitSide = 460;
 constexpr double kDockPad = 22, kDockH = 84, kDockBottom = 48;
 
+// Three pages behind one title bar, as on the desktop build.
+enum class Page { Studio, About, Account };
+
 Ui           g_ui;
+Page         g_page = Page::Studio;
+bool         g_accountNote = false;   // said "accounts are not switched on yet"
+int          g_guide = -1;            // the guide being read, or -1
 SharedState* g_state = nullptr;
 Params       g_params{};
 bool         g_dark = true;
@@ -66,44 +73,54 @@ double       g_meterL = 0, g_meterR = 0;
 std::deque<std::pair<double,double>> g_trail;
 HWND         g_hwnd = nullptr;
 Rect         g_orbitRect{};
+Rect         g_readoutRect{};
+Rect         g_metersRect{};
 Rect         g_plusRect{};
-Rect         g_deviceBox{};
+
+// Only the orbit, its readout and the meters actually move.  Everything else is
+// rendered once into `g_cacheDc` and blitted, so an animating window repaints a
+// handful of shapes per frame instead of the whole page.
+//
+// Without this the window costs 94% of a core doing nothing: the timer
+// invalidates at 30 Hz and a full GDI+ pass -- two 500px radial glows, a lit
+// floor, fifteen knobs, every card and every string -- runs each time whether
+// anything changed or not.  cpp/src/ui/App.cpp caches for the same reason.
+HDC          g_cacheDc = nullptr;
+HBITMAP      g_cacheBmp = nullptr, g_cacheOld = nullptr;
+int          g_cacheW = 0, g_cacheH = 0;
+bool         g_staticDirty = true;
+long         g_shownSecond = -1;   // so the progress bar rebuilds once a second
 NowPlaying   g_np;
 ULONGLONG    g_lastClickMs = 0;
-
-// The wordmark lockup, one per theme, decoded once from the .rc resources.
-Gdiplus::Image* g_logoDark  = nullptr;
-Gdiplus::Image* g_logoLight = nullptr;
+bool         g_tracking = false;   // asked Windows to tell us when the mouse leaves
 
 double S(double v) { return g_ui.s(v); }
 
-// GDI+ wants a stream, and a resource is already a flat block of bytes, so it
-// is copied into an HGLOBAL once rather than unpacked to a temporary file.
-Gdiplus::Image* loadPngResource(HINSTANCE inst, int id) {
-    HRSRC res = FindResourceW(inst, MAKEINTRESOURCEW(id), RT_RCDATA);
-    if (!res) return nullptr;
-    const DWORD size = SizeofResource(inst, res);
-    HGLOBAL data = LoadResource(inst, res);
-    if (!data || size == 0) return nullptr;
-    const void* bytes = LockResource(data);
-    if (!bytes) return nullptr;
+// A test hook rather than a feature.  tools/ui_probe.cpp asks the window to
+// write down where it has just painted every control, then clicks those exact
+// rectangles -- so the harness can never pass against a second copy of the
+// layout arithmetic that has quietly drifted from this one.  It costs one file
+// write, and only when something asks for it.
+// WM_EIGHTD_SYNC draws one frame and does not return until it is done. The
+// harness needs that: UpdateWindow() called from another process does not force
+// a synchronous WM_PAINT, so without this every check read the state one action
+// behind and a click looked as if it had done nothing.
+constexpr UINT WM_EIGHTD_SYNC     = WM_APP + 1;
+constexpr UINT WM_EIGHTD_DUMPHITS = WM_APP + 2;
+bool g_dumpHits = false;
 
-    HGLOBAL buf = GlobalAlloc(GMEM_MOVEABLE, size);
-    if (!buf) return nullptr;
-    if (void* dst = GlobalLock(buf)) {
-        memcpy(dst, bytes, size);
-        GlobalUnlock(buf);
-    }
-    IStream* stream = nullptr;
-    // fDeleteOnRelease: the stream owns the buffer from here.
-    if (FAILED(CreateStreamOnHGlobal(buf, TRUE, &stream)) || !stream) {
-        GlobalFree(buf);
-        return nullptr;
-    }
-    auto* img = Gdiplus::Image::FromStream(stream);
-    stream->Release();
-    if (img && img->GetLastStatus() != Gdiplus::Ok) { delete img; img = nullptr; }
-    return img;
+void dumpHits() {
+    wchar_t dir[MAX_PATH]{};
+    if (!GetTempPathW(MAX_PATH, dir)) return;
+    const std::wstring path = std::wstring(dir) + L"8dmusic-hits.txt";
+    FILE* f = nullptr;
+    if (_wfopen_s(&f, path.c_str(), L"w") != 0 || !f) return;
+    fprintf(f, "dpi %.4f\n", double(g_ui.dpi));
+    fprintf(f, "dark %d\n", g_dark ? 1 : 0);
+    fprintf(f, "menu %d\n", g_ui.openMenu);
+    for (const auto& h : g_ui.hits)
+        fprintf(f, "%d %.2f %.2f %.2f %.2f\n", h.id, h.r.x, h.r.y, h.r.w, h.r.h);
+    fclose(f);
 }
 
 std::wstring widen(const char* s) {
@@ -244,6 +261,31 @@ void applyPreset(int i) {
     publish();
 }
 
+// Which preset these settings are, if they are one.
+//
+// The shared block stores the settings, not the name of the preset they came
+// from, so on every restart the window read back exactly "Classic 8D" and
+// labelled it Custom with no chip lit. Matching by value costs nothing and is
+// honest either way: edit one field and it correctly stops being a preset.
+int presetMatching(const Params& p) {
+    int count = 0;
+    const Preset* list = presets(count);
+    auto same = [](float a, float b) { return std::fabs(a - b) < 1e-6f; };
+    for (int i = 0; i < count; ++i) {
+        const Params& w = list[i].p;
+        if (p.mode == w.mode && p.character == w.character &&
+            same(p.speed, w.speed) && same(p.radius, w.radius) &&
+            same(p.depth, w.depth) && same(p.smoothness, w.smoothness) &&
+            same(p.width, w.width) && same(p.delayMix, w.delayMix) &&
+            same(p.delayTime, w.delayTime) && same(p.delayFeedback, w.delayFeedback) &&
+            same(p.reverbMix, w.reverbMix) && same(p.reverbSize, w.reverbSize) &&
+            same(p.reverbDamp, w.reverbDamp) &&
+            same(p.characterAmount, w.characterAmount))
+            return i;
+    }
+    return -1;
+}
+
 void resetSettings() {
     const bool wasEnabled = g_params.enabled;
     g_params = Params{};
@@ -288,6 +330,7 @@ void drawOrbitStatic(const Rect& r) {
     // the lit floor: brightest just above the middle, so it reads as a stage
     g_ui.discGradient(cx, cy, 196 * k, Y(179),
                       mix(t.ground, t.text, t.dark ? 0.17 : 0.07),
+                      mix(t.ground, t.text, t.dark ? 0.07 : 0.03),
                       mix(t.ground, t.text, t.dark ? 0.04 : 0.02));
 
     // the rim, then the light just inside it
@@ -307,6 +350,8 @@ void drawOrbitStatic(const Rect& r) {
     g_ui.circle(cx, cy, 30 * k, Rgb{ 0, 0, 0 }, 0.22);
     g_ui.circle(X(216), Y(235), 5 * k, head);
     g_ui.circle(X(254), Y(235), 5 * k, head);
+    // the nose: it is what says which way the listener is facing
+    g_ui.fillSvg("M235 209c1.6 0 7 8 7 9s-14 1-14 0 5.4-9 7-9z", r, 470, head);
     g_ui.circle(cx, cy, 18 * k, head);
 
     // the compass, tucked between the rim and the edge of the box
@@ -396,20 +441,50 @@ void drawMeters(const Rect& r) {
 void drawTopBar(const Rect& r) {
     g_ui.fillRect({ r.x, r.y + r.h - 1, r.w, 1 }, g_ui.theme.text, 0.05);
 
-    // The lockup, not a typeset wordmark: it is the same mark the icon and the
-    // other builds carry. Falls back to the drawn one if the resource is gone.
-    Gdiplus::Image* logo = g_dark ? g_logoDark : g_logoLight;
-    double wordX = r.x + S(56);
-    if (logo && logo->GetHeight() > 0) {
-        const double lh = S(26);
-        const double lw = lh * double(logo->GetWidth()) / double(logo->GetHeight());
-        g_ui.image(logo, { r.x + S(20), r.cy() - lh * 0.5, lw, lh });
-        wordX = r.x + S(20) + lw + S(12);
-    } else {
-        g_ui.logo({ r.x + S(20), r.cy() - S(12), S(24), S(24) });
-    }
+    // The mark and the wordmark, exactly as cpp/src/ui/App.cpp draws them: the
+    // four bars, the smile and the moving dot, then the name beside it. The
+    // lockup PNG is not used here because it carries the name itself, and the
+    // two together set "8D Music" twice in one bar.
+    g_ui.logo({ r.x + S(20), r.cy() - S(12), S(24), S(24) });
     g_ui.font(11, W700);
-    g_ui.tracked(wordX, r.cy(), L"8D MUSIC", g_ui.theme.dim, S(2));
+    g_ui.tracked(r.x + S(56), r.cy(), L"8D MUSIC", g_ui.theme.dim, S(2));
+
+    // the three pages, as pills
+    double tabsHalfWidth = 0;
+    {
+        struct TabDef { const wchar_t* label; const Icon* ic; Page page; int id; };
+        const TabDef tabs[3] = {
+            { L"Studio",  &ico::kStudio,  Page::Studio,  101 },
+            { L"About",   &ico::kAbout,   Page::About,   102 },
+            { L"Account", &ico::kAccount, Page::Account, 103 },
+        };
+        double widths[3], total = S(8);
+        g_ui.font(13.5, W600);
+        for (int i = 0; i < 3; ++i) {
+            widths[i] = g_ui.textWidth(tabs[i].label) + S(16) + S(7) + S(36);
+            total += widths[i] + (i ? S(4) : 0);
+        }
+        tabsHalfWidth = total * 0.5;
+        const Rect bar{ r.cx() - total * 0.5, r.cy() - S(21), total, S(42) };
+        g_ui.fillRound(bar, kPill, g_ui.theme.card);
+        double x = bar.x + S(4);
+        for (int i = 0; i < 3; ++i) {
+            const Rect cell{ x, bar.y + S(4), widths[i], S(34) };
+            const bool on = g_page == tabs[i].page;
+            if (g_ui.click(tabs[i].id, cell)) {
+                g_page = tabs[i].page;
+                g_ui.openMenu = 0;
+                g_guide = -1;
+            }
+            if (on) g_ui.fillRound(cell, kPill, g_ui.theme.raised);
+            else if (g_ui.over(cell)) g_ui.fillRound(cell, kPill, g_ui.theme.well);
+            const Rgb c = on ? g_ui.theme.text : g_ui.theme.faint;
+            g_ui.icon(*tabs[i].ic, { cell.x + S(16), cell.cy() - S(8), S(16), S(16) }, c);
+            g_ui.font(13.5, W600);
+            g_ui.text(cell.x + S(16) + S(16) + S(7), cell.cy(), tabs[i].label, c);
+            x += widths[i] + S(4);
+        }
+    }
 
     // the window's own buttons, at the trailing edge
     const double btn = S(36);
@@ -418,10 +493,15 @@ void drawTopBar(const Rect& r) {
 
     // what the effect is doing, and the master switch
     const ApoState apo = apoState();
-    g_ui.font(13, W400);
-    const double dw = g_ui.textWidth(apo.detail);
     g_ui.font(13, W600);
     const double sw = g_ui.textWidth(apo.label);
+    g_ui.font(13, W400);
+    // Everything left of the switch, minus the tab bar and a gap. A refused
+    // format spells out channels and bit depth, which is far too long to sit
+    // beside three tab pills, so it is trimmed rather than allowed to collide.
+    const double room = (r.cx() - tabsHalfWidth) - S(120) - sw - S(60);
+    const std::wstring detail = g_ui.fit(apo.detail, std::max(S(40), room));
+    const double dw = g_ui.textWidth(detail);
     const double pillW = S(14) + S(16) + sw + S(8) + S(6) + S(8) + dw + S(14);
 
     const Rect swBox{ minBtn.x - S(16) - S(44), r.cy() - S(13), S(44), S(26) };
@@ -438,7 +518,7 @@ void drawTopBar(const Rect& r) {
               apo.lit ? g_ui.theme.text : apo.tint);
     g_ui.font(13, W400);
     g_ui.text(pillR.x + S(30) + sw + S(8), pillR.cy(), L"·", g_ui.theme.faint);
-    g_ui.text(pillR.x + S(30) + sw + S(22), pillR.cy(), apo.detail, g_ui.theme.dim);
+    g_ui.text(pillR.x + S(30) + sw + S(22), pillR.cy(), detail, g_ui.theme.dim);
 
     g_ui.font(12, W700);
     g_ui.tracked(swBox.x - lw2 - S(9), r.cy(), L"8D", g_ui.theme.deep, S(1.2));
@@ -483,11 +563,30 @@ void drawStage(const Rect& r) {
     const Rect orbit{ x + (w - side) * 0.5, y + S(8), side, side };
     g_orbitRect = orbit;
     drawOrbitStatic(orbit);
-    drawOrbitLive(orbit);
     y = orbit.y + side;
 
-    drawReadout({ x, y + S(10), w - S(144), S(20) });
-    drawMeters({ x + w - S(130), y + S(10), S(130), S(20) });
+    // In Static the orbit is a control: drag inside it and the source parks
+    // where the pointer left it.  Same rule as cpp/src/ui/Studio.cpp -- the
+    // angle is measured from the front and the rim is three metres out.
+    if (g_params.mode == Mode::Static) {
+        g_ui.note(299, orbit);
+        if (g_ui.over(orbit) && g_ui.mousePressed) g_ui.active = 299;
+        if (g_ui.active == 299 && g_ui.mouseDown) {
+            const double dx = g_ui.mouseX - orbit.cx();
+            const double dy = g_ui.mouseY - orbit.cy();
+            const double scale = orbit.w * 0.417;      // 196/470: the 3 m rim
+            g_params.manualAngle = float(std::atan2(dx, -dy));
+            g_params.radius = float(std::clamp(
+                std::sqrt(dx * dx + dy * dy) / scale * 3.0, 0.25, 3.0));
+            g_preset = -1;
+            publish();
+        }
+    }
+
+    // Both of these are live: they are drawn after the cache is blitted, not
+    // into it, or the cache would keep a stale angle under the new one.
+    g_readoutRect = { x, y + S(10), w - S(144), S(20) };
+    g_metersRect  = { x + w - S(130), y + S(10), S(130), S(20) };
     y += S(30) + S(14);
 
     // presets
@@ -725,15 +824,28 @@ void drawRail(const Rect& r, bool& dirty) {
         sech(x, y, L"ENDPOINT", L"APO in audiodg");
         double ry = y + S(kCardPad) + S(kSechH) + S(12);
 
+        // A readout, not a picker.  The desktop build can move its capture to
+        // another sink, but here the effect is an APO the installer attached to
+        // an endpoint, and the one rule this build does not get to break is
+        // that nothing changes the user's output device.  A dropdown here would
+        // be a control that cannot do what it looks like it does -- and it did
+        // not: refreshDevices() put the choice back two seconds later.
         g_ui.font(13, W400);
-        g_ui.text(x + S(kCardPad), ry + rowH * 0.5, L"Output", t.text);
-        g_deviceBox = { x + colW - S(kCardPad) - S(178), ry, S(178), rowH + S(4) };
-        g_ui.dropdown(381, g_deviceBox,
-                      g_devices.empty()
-                          ? L"No output found"
-                          : g_devices[std::min<size_t>(g_device,
-                                g_devices.size() - 1)].name,
-                      !g_devices.empty());
+        // "Default output", not "Output": the effect runs on whichever endpoint
+        // the installer attached it to, which is not always the default one.
+        g_ui.text(x + S(kCardPad), ry + rowH * 0.5, L"Default output", t.text);
+        {
+            const Rect box{ x + colW - S(kCardPad) - S(178), ry, S(178), rowH + S(4) };
+            g_ui.fillRound(box, kPill, t.well);
+            g_ui.font(12.5, W500);
+            g_ui.text(box.x + S(14), box.cy(),
+                      g_ui.fit(g_devices.empty()
+                                   ? L"No output found"
+                                   : g_devices[std::min<size_t>(
+                                         g_device, g_devices.size() - 1)].name,
+                               box.w - S(28)),
+                      g_devices.empty() ? t.ghost : t.dim);
+        }
         ry += rowH + rowGap;
 
         g_ui.font(13, W400);
@@ -785,10 +897,14 @@ void drawNowPlaying(const Rect& dock) {
     const Rect cover{ dock.x + S(16), dock.cy() - S(26), S(52), S(52) };
     g_ui.fillRound(cover, S(15), have ? Rgb::hex(0x7A1E3C) : th.well);
     if (have) {
+        // Clipped to the cover, as the cairo build clips them: unclipped they
+        // bloom out across the dock and the artwork loses its edge.
+        g_ui.pushClipShape(cover, S(15));
         g_ui.glow(cover.x + cover.w * 0.30, cover.y + cover.h * 0.25,
                   cover.w * 0.62, Rgb::hex(0xFFB36B), 0.85);
         g_ui.glow(cover.x + cover.w * 0.80, cover.y + cover.h * 0.85,
                   cover.w * 0.62, Rgb::hex(0xFF458E), 0.85);
+        g_ui.popClipShape();
     }
     g_ui.font(17, W700);
     g_ui.text(cover.cx(), cover.cy(), have ? t.initials() : L"—",
@@ -846,7 +962,11 @@ void drawNowPlaying(const Rect& dock) {
 // keyboard can do when it is not waiting for anything.
 void drawStatus(const Rect& r) {
     const ApoState apo = apoState();
-    if (!apo.lit) {
+    // Only when something is actually wrong.  "Waiting for audio" is already
+    // spelled out in the title bar, and printing it twice on one screen reads
+    // as a fault rather than as the idle state it is.
+    const bool wrong = !g_state || g_state->formatRejected != 0;
+    if (wrong) {
         g_ui.font(11.5, W500);
         g_ui.text(r.cx(), r.cy(), apo.label + L" — " + apo.detail, apo.tint,
                   Align::Centre);
@@ -881,28 +1001,436 @@ void drawStatus(const Rect& r) {
     }
 }
 
-void paint(HWND hwnd) {
-    PAINTSTRUCT ps;
-    HDC screen = BeginPaint(hwnd, &ps);
-    RECT client;
-    GetClientRect(hwnd, &client);
-    const int w = client.right, h = client.bottom;
+// ------------------------------------------------------------------- pages
+//
+// About and Account, ported from cpp/src/ui/Pages.cpp. Two pages that do not
+// move: what this is, where to find it, and the one thing an account would be
+// for.
+//
+// Two differences from the desktop build, both because the thing behind them
+// does not exist here. It has a Presentations card that replays the welcome
+// flow and the studio tour -- Windows has neither -- and its first guide
+// explains a PipeWire virtual sink, where this one has to explain an APO.
 
-    // Double buffered: the orbit repaints many times a second and a flickering
-    // window reads as a broken one.
-    HDC dc = CreateCompatibleDC(screen);
-    HBITMAP bmp = CreateCompatibleBitmap(screen, w, h);
-    HBITMAP oldBmp = static_cast<HBITMAP>(SelectObject(dc, bmp));
+constexpr double kPagePad = 22, kPageGap = 18, kPageLeftW = 520;
+const wchar_t* kRepoUrl = L"https://github.com/MOHAMEDELWAZANI/8DMusic";
 
-    Gdiplus::Graphics g(dc);
-    g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
-    g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+void openUrl(const std::wstring& url) {
+    ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+}
 
-    g_ui.theme = g_dark ? Theme::darkTheme() : Theme::light();
-    g_ui.shift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
-    g_ui.begin(dc, &g);
-    g_ui.hot = 0;
+// --- guides -----------------------------------------------------------------
 
+struct GuidePoint { const wchar_t* title; const wchar_t* body; };
+struct GuideDef {
+    const wchar_t* kicker; const wchar_t* title; const wchar_t* intro;
+    GuidePoint points[5];
+};
+
+const GuideDef kGuides[4] = {
+    { L"SETUP", L"How the effect gets into your audio",
+      L"8D Music installs an Audio Processing Object — a small piece of code Windows "
+      L"loads inside audiodg.exe, the process that mixes everything you hear. Nothing "
+      L"is routed by hand and no output device changes.",
+      {{ L"It sits on one endpoint",
+         L"The installer attaches the effect to an output device and Windows loads it "
+         L"from then on. The ENDPOINT card says whether it is in the path right now." },
+       { L"Nothing to start",
+         L"There is no capture to begin. When audio plays to that endpoint the effect "
+         L"runs; when it stops, audiodg stops calling it and the orbit parks." },
+       { L"It survives this window",
+         L"Settings live in a shared file the effect reads, so closing this window "
+         L"changes nothing about the sound." },
+       { nullptr, nullptr }, { nullptr, nullptr }}},
+
+    { L"THE EFFECT", L"How 8D works",
+      L"The sound is treated as a source orbiting your head. Rather than swinging the "
+      L"stereo balance left and right, the position is turned into the cues a real "
+      L"sound would produce.",
+      {{ L"Time between the ears",
+         L"The far ear hears the sound up to about 0.7 ms later. This is what pushes the "
+         L"image outside your head instead of leaving it stuck between your ears." },
+       { L"Level and head shadow",
+         L"Constant-power panning keeps loudness steady as the source travels, and your "
+         L"skull blocks high frequencies, so the far ear gets a gentle treble roll-off." },
+       { L"Front and back",
+         L"Positions behind you lose a little upper-mid, the way the outer ear shapes "
+         L"sound arriving from the rear." },
+       { L"Distance",
+         L"Level, air absorption and how much reverb is sent all follow the orbit "
+         L"radius — the Distance knob in Studio." },
+       { nullptr, nullptr }}},
+
+    { L"LISTENING", L"Why headphones",
+      L"8D works by giving each ear its own version of the sound: slightly different "
+      L"timing, level and tone.",
+      {{ L"Speakers undo it",
+         L"They send both versions to both ears, which mixes them back together and "
+         L"cancels the effect. Any headphones or earbuds work — they do not need to "
+         L"be expensive, or to advertise spatial audio of their own." },
+       { L"Turn other spatial effects off",
+         L"Two effects fighting each other sound worse than either alone. If your "
+         L"headphones have a spatial mode of their own, switch it off." },
+       { nullptr, nullptr }, { nullptr, nullptr }, { nullptr, nullptr }}},
+
+    { L"LIMITS", L"An app shows “Nothing playing”",
+      L"The panel in Studio reads what a player publishes to the Windows media session "
+      L"— the same place the volume-key flyout reads. Spotify publishes a title, and "
+      L"browsers report whatever the page declares.",
+      {{ L"Some apps publish nothing",
+         L"Games and most chat apps say nothing at all. They read as “Nothing "
+         L"playing” while you can plainly hear them. That is the boundary of the "
+         L"session API, not a fault in the app." },
+       { L"The effect still applies",
+         L"Whether the title shows has nothing to do with whether the sound is "
+         L"spatialised — that depends only on which endpoint the audio goes to." },
+       { L"Exclusive mode",
+         L"An app that takes the endpoint in exclusive mode bypasses the whole effect "
+         L"chain, including us. Set it to share the device and it comes back." },
+       { nullptr, nullptr }, { nullptr, nullptr }}},
+};
+
+void drawGuide(const Rect& full) {
+    const GuideDef& g = kGuides[std::clamp(g_guide, 0, 3)];
+    const Theme& t = g_ui.theme;
+
+    g_ui.fillRect(full, Rgb{ 0, 0, 0 }, 0.55);
+    const double w = std::min(S(760), full.w - S(80));
+    const double h = std::min(S(660), full.h - S(60));
+    const Rect dlg{ full.cx() - w * 0.5, full.y + (full.h - h) * 0.5, w, h };
+    g_ui.shadow(dlg, S(22), S(26), 0.6, S(12));
+    g_ui.fillRound(dlg, S(22), t.card);
+
+    const double x = dlg.x + S(34), tw = dlg.w - S(68);
+    double y = dlg.y + S(30);
+    g_ui.font(11, W700);
+    g_ui.tracked(x, y + S(6), g.kicker, t.accent, S(2));
+    y += S(24);
+    g_ui.font(28, W800);
+    y += g_ui.flow(x, y, tw, g.title, t.text, 1.15) + S(14);
+    g_ui.font(14, W400);
+    y += g_ui.flow(x, y, tw, g.intro, t.dim, 1.55) + S(16);
+
+    for (const GuidePoint& p : g.points) {
+        if (!p.title) break;
+        g_ui.font(13.5, W400);
+        const double bodyH = g_ui.flowHeight(tw - S(52), p.body, 1.5);
+        const double ph = S(14) + S(18) + S(4) + bodyH + S(14);
+        g_ui.fillRound({ x, y, tw, ph }, S(16), t.well);
+        g_ui.circle(x + S(20), y + S(23), S(4), t.accent);
+        g_ui.font(13.5, W700);
+        g_ui.text(x + S(34), y + S(23), p.title, t.text);
+        g_ui.font(13.5, W400);
+        g_ui.flow(x + S(34), y + S(30), tw - S(52), p.body, t.dim, 1.5);
+        y += ph + S(10);
+    }
+
+    const Rect close{ dlg.x + dlg.w - S(34) - S(96), dlg.y + dlg.h - S(26) - S(42),
+                      S(96), S(42) };
+    if (g_ui.pill(560, close, L"Close", t.text, t.ground, 14)) g_guide = -1;
+}
+
+// --- about ------------------------------------------------------------------
+
+void drawAbout(const Rect& body) {
+    const Theme& t = g_ui.theme;
+    const double top = body.y + S(18);
+    const double bottom = body.y + body.h - S(16);
+    const Rect left{ body.x + S(kPagePad), top, S(kPageLeftW), bottom - top };
+    const Rect right{ left.x + S(kPageLeftW) + S(kPageGap), top,
+                      body.w - S(kPagePad) * 2 - S(kPageLeftW) - S(kPageGap),
+                      bottom - top };
+
+    double y = left.y;
+
+    // hero
+    {
+        const double markSide = S(132);
+        const std::wstring headline = L"Real-time 8D for everything your computer plays";
+        const double tx = left.x + S(22) + markSide + S(22);
+        const double tw = left.x + left.w - S(22) - tx;
+        g_ui.font(24, W600, true);
+        const double th = g_ui.flowHeight(tw, headline, 1.2);
+        const double h = std::max(markSide + S(44), S(42) + th + S(16) + S(28) + S(22));
+
+        g_ui.fillRound({ left.x, y, left.w, h }, S(kCardR), t.card);
+        const Rect mark{ left.x + S(22), y + (h - markSide) * 0.5, markSide, markSide };
+        g_ui.glow(mark.cx(), mark.cy(), S(96), t.accent, t.dark ? 0.14 : 0.08);
+        g_ui.ringDashed(mark.cx(), mark.cy(), S(62), t.line, 1, 1.0, S(1), S(7));
+        g_ui.circle(mark.cx(), mark.cy(), S(46), t.well);
+        g_ui.ring(mark.cx(), mark.cy(), S(46), t.accent, 1, 0.25);
+        g_ui.logo({ mark.cx() - S(31), mark.cy() - S(31), S(62), S(62) });
+
+        g_ui.font(10.5, W700);
+        g_ui.tracked(tx, y + S(30), L"8D MUSIC", t.faint, S(3));
+        g_ui.font(24, W600, true);
+        g_ui.flow(tx, y + S(42), tw, headline, t.text, 1.2);
+        const double chipY = y + S(42) + th + S(16);
+        const wchar_t* chips[3] = { L"Version 1.0", L"Linux · Windows", L"Open source" };
+        double cx = tx;
+        for (int i = 0; i < 3; ++i) {
+            g_ui.font(11.5, i == 2 ? W600 : W400);
+            const Rect c{ cx, chipY, g_ui.textWidth(chips[i]) + S(26), S(28) };
+            g_ui.fillRound(c, kPill, i == 2 ? mix(t.card, t.motion, 0.18) : t.well);
+            g_ui.text(c.cx(), c.cy(), chips[i],
+                      i == 2 ? mix(t.motion, t.text, 0.35) : t.dim, Align::Centre);
+            cx += c.w + S(7);
+        }
+        y += h + S(14);
+    }
+
+    // our story
+    {
+        const double h = S(160);
+        g_ui.fillRound({ left.x, y, left.w, h }, S(kCardR), t.card);
+        const double x = left.x + S(18), w = left.w - S(36);
+        g_ui.font(10.5, W700);
+        g_ui.tracked(x, y + S(22), L"OUR STORY", t.accent, S(2));
+        g_ui.font(17, W700);
+        double used = g_ui.flow(x, y + S(33), w,
+            L"One effect, written once in C++, sounding the same on Linux, "
+            L"Windows and Android.", t.text, 1.35);
+        used += S(9);
+        g_ui.font(13, W400);
+        g_ui.flow(x, y + S(33) + used, w,
+            L"No uploading, no converting. Spotify, browsers, games and your own "
+            L"files are spatialised live on their way to your headphones.", t.dim, 1.55);
+
+        const Rect link{ x, y + h - S(34), S(160), S(24) };
+        if (g_ui.click(501, link)) openUrl(std::wstring(kRepoUrl) + L"#readme");
+        g_ui.font(13, W700);
+        g_ui.text(link.x, link.cy(), L"Read the full story", t.accent);
+        g_ui.icon(ico::kChevron,
+                  { link.x + g_ui.textWidth(L"Read the full story") + S(6),
+                    link.cy() - S(7), S(14), S(14) }, t.accent);
+        y += h + S(14);
+    }
+
+    // what's new
+    {
+        const double h = S(168);
+        g_ui.fillRound({ left.x, y, left.w, h }, S(kCardR), t.card);
+        const double x = left.x + S(18), w = left.w - S(36);
+        g_ui.font(10.5, W700);
+        g_ui.tracked(x, y + S(22), L"WHAT'S NEW IN 1.0", t.accent, S(2));
+        const Rect log{ left.x + left.w - S(18) - S(110), y + S(12), S(110), S(20) };
+        if (g_ui.click(502, log)) openUrl(std::wstring(kRepoUrl) + L"/releases");
+        g_ui.font(11.5, W400);
+        g_ui.text(log.x + log.w - S(16), log.cy(), L"Full changelog", t.faint, Align::Right);
+        g_ui.icon(ico::kExternal, { log.x + log.w - S(12), log.cy() - S(6), S(12), S(12) },
+                  t.faint);
+
+        const wchar_t* bullets[3] = {
+            L"<b>One window, every control.</b> Movement, space, echo, character and "
+            L"EQ all sit beside the orbit — nothing is a page away any more.",
+            L"<b>Presets you can A/B.</b> Save a setting, recall it in one click, and "
+            L"press B to hear the track dry.",
+            L"<b>The same engine as the phone.</b> One C++20 core, so a preset sounds "
+            L"identical on Linux, Windows and Android.",
+        };
+        double by = y + S(38);
+        for (int i = 0; i < 3; ++i) {
+            g_ui.font(12.5, W400);
+            g_ui.text(x + S(2), by + S(9), L"·", t.accent);
+            by += g_ui.flow(x + S(12), by, w - S(12), bullets[i], t.dim, 1.5) + S(8);
+        }
+        y += h + S(14);
+    }
+
+    // support, pinned to the foot of the column
+    {
+        const double h = S(92);
+        const Rect c{ left.x, left.y + left.h - h, left.w, h };
+        g_ui.fillRound(c, S(kCardR), t.card);
+        g_ui.linearRound(c, S(kCardR), t.motion, 0.22, 0.0);
+
+        g_ui.glow(c.x + S(44), c.cy(), S(46), t.motion, 0.35);
+        g_ui.circle(c.x + S(44), c.cy(), S(24), t.motion);
+        g_ui.icon(ico::kHeart, { c.x + S(33), c.cy() - S(11), S(22), S(22) },
+                  Rgb::hex(0xFFFFFF));
+        const Rect b{ c.x + c.w - S(20) - S(112), c.cy() - S(20), S(112), S(40) };
+        g_ui.font(15, W700);
+        g_ui.text(c.x + S(84), c.cy() - S(20), L"Support 8D Music", t.text);
+        g_ui.font(12.5, W400);
+        g_ui.flow(c.x + S(84), c.cy() - S(12), b.x - S(14) - (c.x + S(84)),
+                  L"Free, no ads, open source. A donation keeps it that way.",
+                  t.dim, 1.45);
+        if (g_ui.pill(503, b, L"Donate", t.text, t.ground, 14)) openUrl(kRepoUrl);
+    }
+
+    // ---- what you can do from here --------------------------------------
+    y = right.y;
+
+    // guides
+    {
+        g_ui.font(19, W600, true);
+        g_ui.text(right.x, y + S(13), L"Guides", t.text);
+        y += S(37);
+
+        struct Row { const Icon* ic; bool tinted; const wchar_t* title; const wchar_t* sub; };
+        const Row rows[4] = {
+            { &ico::kMonitor, true, L"How the effect gets in",
+              L"An APO inside audiodg, and nothing rerouted" },
+            { &ico::kStudio, false, L"How 8D works",
+              L"The five cues that move sound around you" },
+            { &ico::kHeadphones, false, L"Why headphones",
+              L"8D needs each ear to hear its own side" },
+            { &ico::kClock, false, L"An app shows “Nothing playing”",
+              L"Exclusive-mode apps and what to do about them" },
+        };
+        const double h = 4 * S(58) + S(8);
+        g_ui.fillRound({ right.x, y, right.w, h }, S(kCardR), t.card);
+        for (int i = 0; i < 4; ++i) {
+            const Rect row{ right.x + S(14), y + S(4) + S(58) * i, right.w - S(28), S(58) };
+            if (i) g_ui.fillRect({ row.x + S(4), row.y, row.w - S(8), 1 }, t.text, 0.05);
+            if (g_ui.listRow(520 + i, row, *rows[i].ic,
+                             rows[i].tinted ? t.accent : t.dim,
+                             rows[i].tinted ? mix(t.card, t.accent, 0.12) : t.well,
+                             rows[i].title, rows[i].sub, ico::kChevron))
+                g_guide = i;
+        }
+        y += h + S(14);
+    }
+
+    // get involved, pinned above the footer
+    {
+        const double h = 3 * S(58) + S(8);
+        y = right.y + right.h - S(28) - h;
+        g_ui.font(19, W600, true);
+        g_ui.text(right.x, y - S(24), L"Get involved", t.text);
+        g_ui.fillRound({ right.x, y, right.w, h }, S(kCardR), t.card);
+
+        const Rect r0{ right.x + S(14), y + S(4), right.w - S(28), S(58) };
+        if (g_ui.listRow(530, r0, ico::kGithub, t.ground, t.text, L"Source code",
+                         L"github.com/MOHAMEDELWAZANI/8DMusic", ico::kExternal))
+            openUrl(kRepoUrl);
+        const Rect r1{ right.x + S(14), y + S(4) + S(58), right.w - S(28), S(58) };
+        g_ui.fillRect({ r1.x + S(4), r1.y, r1.w - S(8), 1 }, t.text, 0.05);
+        if (g_ui.listRow(531, r1, ico::kGlobe, t.dim, t.well, L"Website",
+                         L"News, releases and the mobile build", ico::kExternal))
+            openUrl(kRepoUrl);
+        const Rect r2{ right.x + S(14), y + S(4) + S(116), right.w - S(28), S(58) };
+        (void)0;
+        g_ui.fillRect({ r2.x + S(4), r2.y, r2.w - S(8), 1 }, t.text, 0.05);
+        if (g_ui.listRow(532, r2, ico::kUser, t.accent, mix(t.card, t.accent, 0.12),
+                         L"Help build 8D Music",
+                         L"Sign in to test early versions — that is the Account tab",
+                         ico::kChevron))
+            g_page = Page::Account;
+    }
+
+    // the footer
+    {
+        const double fy = right.y + right.h - S(6);
+        g_ui.icon(ico::kLock, { right.x, fy - S(7), S(13), S(13) }, t.ghost);
+        g_ui.font(11.5, W400);
+        g_ui.text(right.x + S(20), fy,
+                  L"Your audio never leaves this computer · 8D Music 1.0 · "
+                  L"C++20 DSP engine · GDI+ UI", t.ghost);
+    }
+}
+
+// --- account ----------------------------------------------------------------
+
+void drawAccount(const Rect& body) {
+    const Theme& t = g_ui.theme;
+    g_ui.glow(body.cx(), body.y + body.h * 0.42, S(420), t.accent, t.dark ? 0.14 : 0.08);
+    g_ui.glow(body.cx() + S(90), body.y + body.h * 0.22, S(320), t.motion,
+              t.dark ? 0.10 : 0.06);
+
+    const double cx = body.cx();
+    double y = body.y + body.h * 0.5 - S(214);
+
+    // the empty seat
+    g_ui.ringDashed(cx, y + S(48), S(45), t.line, 1, 1.0, S(1), S(7));
+    g_ui.circle(cx, y + S(48), S(34), t.card);
+    g_ui.icon(ico::kUser, { cx - S(17), y + S(31), S(34), S(34) }, t.faint);
+    y += S(112);
+
+    g_ui.font(27, W600, true);
+    g_ui.text(cx, y + S(17), L"You are not signed in", t.text, Align::Centre);
+    y += S(46);
+
+    g_ui.font(14, W400);
+    const double bw = S(470);
+    g_ui.flow(cx - bw * 0.5, y, bw,
+              L"8D Music works fully without an account. Signing in is only for testing "
+              L"early builds and keeping your presets on every machine.",
+              t.dim, 1.55, true, Align::Centre);
+    y += S(70);
+
+    const double bwid = S(430);
+    const Rect google{ cx - bwid * 0.5, y, bwid, S(52) };
+    if (g_ui.click(600, google)) g_accountNote = true;
+    g_ui.fillRound(google, kPill,
+                   g_ui.over(google) ? mix(t.text, t.ground, 0.08) : t.text);
+    {
+        g_ui.font(15, W600);
+        const double lw = g_ui.textWidth(L"Continue with Google");
+        const double gx = google.cx() - (lw + S(11) + S(19)) * 0.5;
+        // Google's mark, in its own colours
+        struct Wedge { uint32_t colour; const char* d; };
+        static const Wedge kG[4] = {
+            { 0x4285F4, "M23 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.2a5.3 5.3 0 0 1-2.3 3.5v2.9h3.7c2.2-2 3.4-5 3.4-8.6z" },
+            { 0x34A853, "M12 23.5c3.1 0 5.7-1 7.6-2.8l-3.7-2.9c-1 .7-2.3 1.1-3.9 1.1-3 0-5.5-2-6.4-4.7H1.8v3C3.7 20.9 7.6 23.5 12 23.5z" },
+            { 0xFBBC05, "M5.6 14.2a6.9 6.9 0 0 1 0-4.4v-3H1.8a11.5 11.5 0 0 0 0 10.4l3.8-3z" },
+            { 0xEA4335, "M12 5.1c1.7 0 3.2.6 4.4 1.7l3.3-3.3C17.7 1.6 15.1.5 12 .5 7.6.5 3.7 3.1 1.8 6.8l3.8 3c.9-2.7 3.4-4.7 6.4-4.7z" },
+        };
+        for (const auto& wdg : kG)
+            g_ui.fillSvg(wdg.d, { gx, google.cy() - S(9.5), S(19), S(19) }, 24,
+                         Rgb::hex(wdg.colour));
+        g_ui.font(15, W600);
+        g_ui.text(gx + S(19) + S(11), google.cy(), L"Continue with Google", t.ground);
+    }
+    y += S(62);
+
+    const Rect gh{ cx - bwid * 0.5, y, bwid, S(52) };
+    if (g_ui.click(601, gh)) g_accountNote = true;
+    g_ui.fillRound(gh, kPill, g_ui.over(gh) ? mix(t.card, t.text, 0.08) : t.card);
+    {
+        g_ui.font(15, W600);
+        const double lw = g_ui.textWidth(L"Continue with GitHub");
+        const double gx = gh.cx() - (lw + S(11) + S(20)) * 0.5;
+        g_ui.icon(ico::kGithub, { gx, gh.cy() - S(10), S(20), S(20) }, t.text);
+        g_ui.text(gx + S(20) + S(11), gh.cy(), L"Continue with GitHub", t.text);
+    }
+    y += S(64);
+
+    g_ui.font(13, W400);
+    g_ui.text(cx, y + S(10),
+              g_accountNote
+                  ? L"Accounts are not switched on yet — the app works without one."
+                  : L"Keep using 8D Music without an account",
+              g_accountNote ? t.warn : t.faint, Align::Centre);
+
+    // What this page becomes, once we have talked about it.
+    const double sy = body.y + body.h - S(62);
+    g_ui.line(0, sy, body.w, sy, t.text, 1, 0.10);
+
+    g_ui.font(10.5, W700);
+    const Rect tag{ S(22), sy + S(16),
+                    g_ui.trackedWidth(L"TO DESIGN NEXT", S(1.4)) + S(26), S(24) };
+    g_ui.fillRound(tag, kPill, mix(t.ground, t.motion, 0.16));
+    g_ui.tracked(tag.cx(), tag.cy(), L"TO DESIGN NEXT", mix(t.motion, t.text, 0.35),
+                 S(1.4), Align::Centre);
+
+    const wchar_t* stubs[4] = { L"Profile & plan", L"Presets synced across devices",
+                                L"Early builds / beta channel", L"Contributor dashboard" };
+    const double stubX = tag.x + tag.w + S(12);
+    const double stubW = (body.w - S(22) - stubX - S(8) * 3) / 4.0;
+    for (int i = 0; i < 4; ++i) {
+        const Rect st{ stubX + (stubW + S(8)) * i, sy + S(13), stubW, S(34) };
+        g_ui.strokeRound(st, S(12), t.text, 1, 0.12);
+        g_ui.font(11.5, W400);
+        g_ui.text(st.cx(), st.cy(), g_ui.fit(stubs[i], st.w - S(12)), t.ghost,
+                  Align::Centre);
+    }
+}
+
+// Everything that stays put.  Runs only when something has actually changed --
+// which includes every input event, because the widgets handle input as they
+// draw.
+void drawChrome(int w, int h) {
     g_ui.fillRect({ 0, 0, double(w), double(h) }, g_ui.theme.ground);
 
     // The light this layout stands in, kept below the title bar so the chrome
@@ -918,35 +1446,106 @@ void paint(HWND hwnd) {
     bool dirty = false;
     const Rect body{ 0, top, double(w), double(h) - top };
     drawTopBar({ 0, 0, double(w), top });
-    drawStage({ body.x, body.y, S(kStageW), body.h });
-    drawRail({ body.x + S(kStageW), body.y, body.w - S(kStageW), body.h }, dirty);
-    drawNowPlaying({ body.x + S(kDockPad),
-                     body.y + body.h - S(kDockBottom) - S(kDockH),
-                     body.w - S(kDockPad) * 2, S(kDockH) });
-    drawStatus({ 0, double(h) - S(30), double(w), S(20) });
+
+    // Only Studio animates, so only Studio leaves anything for the live pass.
+    // Clearing these on the other pages stops a stale orbit being painted over
+    // About or Account.
+    if (g_page != Page::Studio) {
+        g_orbitRect = {}; g_readoutRect = {}; g_metersRect = {};
+    }
+
+    switch (g_page) {
+    case Page::Studio:
+        drawStage({ body.x, body.y, S(kStageW), body.h });
+        drawRail({ body.x + S(kStageW), body.y, body.w - S(kStageW), body.h }, dirty);
+        drawNowPlaying({ body.x + S(kDockPad),
+                         body.y + body.h - S(kDockBottom) - S(kDockH),
+                         body.w - S(kDockPad) * 2, S(kDockH) });
+        drawStatus({ 0, double(h) - S(kDockBottom) + S(10), double(w), S(20) });
+        break;
+    case Page::About:   drawAbout(body);   break;
+    case Page::Account: drawAccount(body); break;
+    }
 
     // Menus paint last so their lists sit above the page.
-    int countPresets = 0;
-    const Preset* list = presets(countPresets);
-    std::vector<std::wstring> names;
-    for (int i = 0; i < countPresets; ++i) names.push_back(widen(list[i].name));
-    int pick = g_ui.menuPopup(240, g_plusRect, names, g_preset, 190);
-    if (pick >= 0) applyPreset(pick);
+    if (g_page == Page::Studio) {
+        int countPresets = 0;
+        const Preset* list = presets(countPresets);
+        std::vector<std::wstring> names;
+        for (int i = 0; i < countPresets; ++i) names.push_back(widen(list[i].name));
+        const int pick = g_ui.menuPopup(240, g_plusRect, names, g_preset, 190);
+        if (pick >= 0) applyPreset(pick);
+    }
 
-    std::vector<std::wstring> devNames;
-    for (const auto& d : g_devices) devNames.push_back(d.name);
-    pick = g_ui.menuPopup(381, g_deviceBox, devNames, g_device);
-    if (pick >= 0) g_device = pick;
+    // A guide is a dialog: it owns the window while it is up.
+    if (g_guide >= 0) drawGuide({ 0, 0, double(w), double(h) });
 
     if (dirty) publish();
+}
+
+void paint(HWND hwnd) {
+    PAINTSTRUCT ps;
+    HDC screen = BeginPaint(hwnd, &ps);
+    RECT client;
+    GetClientRect(hwnd, &client);
+    const int w = client.right, h = client.bottom;
+
+    g_ui.theme = g_dark ? Theme::darkTheme() : Theme::light();
+    g_ui.shift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+    g_ui.viewW = w;
+    g_ui.viewH = h;
+
+    if (!g_cacheDc || g_cacheW != w || g_cacheH != h) {
+        if (g_cacheDc) {
+            SelectObject(g_cacheDc, g_cacheOld);
+            DeleteObject(g_cacheBmp);
+            DeleteDC(g_cacheDc);
+        }
+        g_cacheDc = CreateCompatibleDC(screen);
+        g_cacheBmp = CreateCompatibleBitmap(screen, w, h);
+        g_cacheOld = static_cast<HBITMAP>(SelectObject(g_cacheDc, g_cacheBmp));
+        g_cacheW = w; g_cacheH = h;
+        g_staticDirty = true;
+    }
+
+    if (g_staticDirty) {
+        // Cleared *before* the pass, not after: the widgets change state as they
+        // draw -- a preset applied, a menu picked -- and anything they set has
+        // to survive into the next frame rather than be wiped by this one.
+        g_staticDirty = false;
+        Gdiplus::Graphics g(g_cacheDc);
+        g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+        g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+        g_ui.begin(g_cacheDc, &g);
+        g_ui.hot = 0;
+        drawChrome(w, h);
+        g_ui.endFrame();
+        if (g_dumpHits) { g_dumpHits = false; dumpHits(); }
+        if (g_staticDirty) InvalidateRect(hwnd, nullptr, FALSE);
+    }
+
+    // Double buffered: the orbit repaints many times a second and a flickering
+    // window reads as a broken one.
+    HDC dc = CreateCompatibleDC(screen);
+    HBITMAP bmp = CreateCompatibleBitmap(screen, w, h);
+    HBITMAP oldBmp = static_cast<HBITMAP>(SelectObject(dc, bmp));
+    BitBlt(dc, 0, 0, w, h, g_cacheDc, 0, 0, SRCCOPY);
+
+    {
+        Gdiplus::Graphics g(dc);
+        g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+        g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+        g_ui.use(dc, &g);
+        if (g_orbitRect.w > 0) drawOrbitLive(g_orbitRect);
+        if (g_readoutRect.w > 0) drawReadout(g_readoutRect);
+        if (g_metersRect.w > 0) drawMeters(g_metersRect);
+    }
 
     BitBlt(screen, 0, 0, w, h, dc, 0, 0, SRCCOPY);
     SelectObject(dc, oldBmp);
     DeleteObject(bmp);
     DeleteDC(dc);
     EndPaint(hwnd, &ps);
-
-    g_ui.endFrame();
 }
 
 // The window wears no decoration, so its outline is ours to cut.
@@ -970,25 +1569,85 @@ LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             // The heartbeat is the only honest answer to "is it running".
             // audiodg stops calling APOProcess when nothing plays, so a few
             // stale ticks mean idle, not dead.
+            const bool wasAlive = g_alive;
             if (g_state) {
                 const LONG beat = g_state->heartbeat;
                 if (beat != g_lastBeat) { g_alive = true; g_staleTicks = 0; }
                 else if (++g_staleTicks > 8) g_alive = false;
                 g_lastBeat = beat;
             }
-            InvalidateRect(hwnd, nullptr, FALSE);
+            // The state pill, the ENDPOINT row and the status line all read
+            // from this, so a change is a change to the chrome.
+            if (g_alive != wasAlive) g_staticDirty = true;
+
+            // The progress bar and its clock move a pixel a second, so the
+            // chrome is rebuilt when the displayed second changes, not per frame.
+            if (g_np.has()) {
+                const Track t = g_np.track();
+                const double now = std::chrono::duration<double>(
+                    std::chrono::steady_clock::now().time_since_epoch()).count();
+                const long second = long(t.at(now));
+                if (second != g_shownSecond) { g_shownSecond = second; g_staticDirty = true; }
+            } else if (g_shownSecond != -1) {
+                g_shownSecond = -1; g_staticDirty = true;
+            }
+
+            // Nothing playing and no meter still falling means nothing on this
+            // page is moving, and a repaint would draw the identical frame.
+            const bool animating = g_alive || g_ui.active != 0 ||
+                                   g_meterL > 0.002 || g_meterR > 0.002;
+            if (animating || g_staticDirty) InvalidateRect(hwnd, nullptr, FALSE);
         } else if (wp == 2) {
+            const size_t before = g_devices.size();
+            const int was = g_device;
             refreshDevices();
+            if (before != g_devices.size() || was != g_device) {
+                g_staticDirty = true;
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
         }
         return 0;
 
+    // Both of these run on the window's own thread, so UpdateWindow here really
+    // does paint before returning.
+    case WM_EIGHTD_SYNC:
+        g_staticDirty = true;
+        InvalidateRect(hwnd, nullptr, FALSE);
+        UpdateWindow(hwnd);
+        return 0;
+
+    case WM_EIGHTD_DUMPHITS:
+        g_dumpHits = true;
+        g_staticDirty = true;
+        InvalidateRect(hwnd, nullptr, FALSE);
+        UpdateWindow(hwnd);
+        return 0;
+
     case WM_MOUSEMOVE:
+        g_staticDirty = true;
         g_ui.mouseX = GET_X_LPARAM(lp);
         g_ui.mouseY = GET_Y_LPARAM(lp);
+        // Windows does not say when the pointer leaves unless it is asked, and
+        // without asking, whatever was last under it stays lit for as long as
+        // the window is open -- a tile or knob glowing at nothing.
+        if (!g_tracking) {
+            TRACKMOUSEEVENT t{ sizeof(TRACKMOUSEEVENT), TME_LEAVE, hwnd, 0 };
+            g_tracking = TrackMouseEvent(&t) != 0;
+        }
+        InvalidateRect(hwnd, nullptr, FALSE);
+        return 0;
+
+    case WM_MOUSELEAVE:
+        g_staticDirty = true;
+        g_tracking = false;
+        // Not while a control is being dragged: capture keeps the pointer ours
+        // even outside the window, and a knob must not let go mid-turn.
+        if (!g_ui.mouseDown) { g_ui.mouseX = -1e6; g_ui.mouseY = -1e6; }
         InvalidateRect(hwnd, nullptr, FALSE);
         return 0;
 
     case WM_LBUTTONDOWN: {
+        g_staticDirty = true;
         g_ui.mouseX = GET_X_LPARAM(lp);
         g_ui.mouseY = GET_Y_LPARAM(lp);
         const ULONGLONG now = GetTickCount64();
@@ -1002,6 +1661,7 @@ LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     }
 
     case WM_LBUTTONUP:
+        g_staticDirty = true;
         g_ui.mouseX = GET_X_LPARAM(lp);
         g_ui.mouseY = GET_Y_LPARAM(lp);
         g_ui.mouseDown = false;
@@ -1013,15 +1673,26 @@ LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     // Anywhere along the bar that is not a control is a handle: press it and
     // the window moves.  Windows does the dragging; it knows about edges,
     // monitors and snapping, and we do not.
+    //
+    // The answer comes from the rectangles the last frame actually painted, not
+    // from `hot`.  Asking `hot` looks like it should work and cannot: Windows
+    // hit-tests *before* it delivers the move, and the moment this says
+    // HTCAPTION it stops sending WM_MOUSEMOVE at all and sends WM_NCMOUSEMOVE
+    // instead -- so the pointer position never updates over the bar, nothing up
+    // there ever becomes hot, and the answer stays HTCAPTION for good.  Close,
+    // minimise and the 8D switch were all unclickable, and pressing any of them
+    // dragged the window.
     case WM_NCHITTEST: {
         POINT p{ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) };
         ScreenToClient(hwnd, &p);
-        if (p.y < S(kTopBar) && g_ui.hot == 0 && g_ui.openMenu == 0)
-            return HTCAPTION;
-        return HTCLIENT;
+        if (p.y >= S(kTopBar) || g_ui.openMenu != 0) return HTCLIENT;
+        for (const auto& h : g_ui.hits)
+            if (h.r.contains(p.x, p.y)) return HTCLIENT;
+        return HTCAPTION;
     }
 
     case WM_MOUSEWHEEL: {
+        g_staticDirty = true;
         POINT p{ GET_X_LPARAM(lp), GET_Y_LPARAM(lp) };
         ScreenToClient(hwnd, &p);
         g_ui.mouseX = p.x;
@@ -1032,11 +1703,21 @@ LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     }
 
     case WM_KEYDOWN: {
-        if (wp >= '1' && wp <= '9')      applyPreset(int(wp - '1'));
-        else if (wp == '0')              applyPreset(9);
-        else if (wp == 'B') { g_params.enabled = !g_params.enabled; publish(); }
-        else if (wp == 'T') { g_dark = !g_dark; }
-        else if (wp == VK_ESCAPE) g_ui.openMenu = 0;
+        g_staticDirty = true;
+        // A guide owns the keyboard while it is up, and the presets belong to
+        // Studio -- typing 3 on the About page should not silently retune the
+        // effect behind it.
+        if (g_guide >= 0) {
+            if (wp == VK_ESCAPE || wp == VK_RETURN) g_guide = -1;
+        } else if (wp == 'T') {
+            g_dark = !g_dark;
+        } else if (wp == VK_ESCAPE) {
+            g_ui.openMenu = 0;
+        } else if (g_page == Page::Studio) {
+            if (wp >= '1' && wp <= '9')      applyPreset(int(wp - '1'));
+            else if (wp == '0')              applyPreset(9);
+            else if (wp == 'B') { g_params.enabled = !g_params.enabled; publish(); }
+        }
         InvalidateRect(hwnd, nullptr, FALSE);
         return 0;
     }
@@ -1047,15 +1728,26 @@ LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                      int(kBaseW * g_ui.dpi), int(kBaseH * g_ui.dpi),
                      SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOMOVE);
         applyRoundedCorners(hwnd);
+        g_staticDirty = true;
         InvalidateRect(hwnd, nullptr, TRUE);
         return 0;
     }
 
     case WM_SIZE:       applyRoundedCorners(hwnd);
+                        g_staticDirty = true;
                         InvalidateRect(hwnd, nullptr, FALSE); return 0;
     case WM_PAINT:      paint(hwnd); return 0;
     case WM_ERASEBKGND: return 1;
-    case WM_DESTROY:    KillTimer(hwnd, 1); KillTimer(hwnd, 2); PostQuitMessage(0); return 0;
+    case WM_DESTROY:
+        KillTimer(hwnd, 1); KillTimer(hwnd, 2);
+        if (g_cacheDc) {
+            SelectObject(g_cacheDc, g_cacheOld);
+            DeleteObject(g_cacheBmp);
+            DeleteDC(g_cacheDc);
+            g_cacheDc = nullptr;
+        }
+        PostQuitMessage(0);
+        return 0;
     }
     return DefWindowProcW(hwnd, msg, wp, lp);
 }
@@ -1068,7 +1760,14 @@ std::wstring bundledFontPath() {
     const size_t cut = dir.find_last_of(L'\\');
     if (cut == std::wstring::npos) return L"";
     dir.resize(cut + 1);
-    const wchar_t* tries[] = { L"Figtree.ttf", L"assets\\fonts\\Figtree.ttf",
+    // The last two are the source tree, from build\Release\ and from build\.
+    // The three-dot one is not a typo and it is the one that matters: with only
+    // two, the search landed in windows\build\cpp\ instead of the repo's cpp\,
+    // the file was never found, and the whole interface quietly fell back to
+    // Segoe UI -- which looks nothing like the design.
+    const wchar_t* tries[] = { L"Figtree.ttf",
+                               L"assets\\fonts\\Figtree.ttf",
+                               L"..\\..\\..\\cpp\\assets\\fonts\\Figtree.ttf",
                                L"..\\..\\cpp\\assets\\fonts\\Figtree.ttf" };
     for (const wchar_t* t : tries) {
         const std::wstring path = dir + t;
@@ -1080,6 +1779,24 @@ std::wstring bundledFontPath() {
 } // namespace
 
 int APIENTRY wWinMain(HINSTANCE inst, HINSTANCE, LPWSTR, int show) {
+    // One window, not one per double-click.  Two copies would both hold the
+    // shared block open and both write to it, so whichever painted last would
+    // win and the other would silently undo the user's changes.  A second
+    // launch brings the first one forward instead, which is what clicking the
+    // shortcut again is asking for anyway.
+    //
+    // Local\ rather than Global\: this is per-user, and a plain interactive
+    // account has no SeCreateGlobalPrivilege to make a global name with.
+    HANDLE only = CreateMutexW(nullptr, TRUE, L"Local\\8DMusic.SingleInstance");
+    if (only && GetLastError() == ERROR_ALREADY_EXISTS) {
+        if (HWND running = FindWindowW(L"EightDMusicWindow", nullptr)) {
+            if (IsIconic(running)) ShowWindow(running, SW_RESTORE);
+            SetForegroundWindow(running);
+        }
+        CloseHandle(only);
+        return 0;
+    }
+
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
@@ -1087,14 +1804,15 @@ int APIENTRY wWinMain(HINSTANCE inst, HINSTANCE, LPWSTR, int show) {
     ULONG_PTR gdiToken = 0;
     Gdiplus::GdiplusStartup(&gdiToken, &gdiIn, nullptr);
 
-    g_logoDark  = loadPngResource(inst, IDR_LOGO_DARK);
-    g_logoLight = loadPngResource(inst, IDR_LOGO_LIGHT);
-
     // The installer creates the block: audiodg lives in session 0, so it has to
     // cross sessions, and a non-elevated process has no SeCreateGlobalPrivilege
     // with which to make a Global\ object. See SharedState.h.
     g_state = openSharedState(true);
-    if (g_state) { g_params = g_state->params; publish(); }
+    if (g_state) {
+        g_params = g_state->params;
+        g_preset = presetMatching(g_params);
+        publish();
+    }
 
     refreshDevices();
     g_np.start();
@@ -1150,9 +1868,8 @@ int APIENTRY wWinMain(HINSTANCE inst, HINSTANCE, LPWSTR, int show) {
     }
 
     g_np.stop();
-    delete g_logoDark;
-    delete g_logoLight;
     closeSharedState();
+    if (only) { ReleaseMutex(only); CloseHandle(only); }
     Gdiplus::GdiplusShutdown(gdiToken);
     CoUninitialize();
     return 0;

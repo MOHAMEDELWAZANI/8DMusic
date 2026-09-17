@@ -60,6 +60,11 @@ public:
     // the app from the PipeWire graph.
     void setCapturedApps(std::vector<std::string> apps);
 
+    // Stands a track up with no player behind it, so the design shots show the
+    // dock as it looks in use rather than as it looks on a silent desktop.
+    // Only --shot calls this; the bus thread overwrites it on the next poll.
+    void poseTrack(Track t);
+
 private:
     void loop();
     void poll(sd_bus* bus);

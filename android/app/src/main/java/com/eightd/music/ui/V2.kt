@@ -33,8 +33,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -92,6 +96,64 @@ fun Glow(
     }
 }
 
+/*
+ * The two faces the cover mark is drawn in.  They cover disjoint alphabets --
+ * Pixelify Sans has all 52 Latin letters and no Arabic, KO Methlama 112 Arabic
+ * letters and no Latin -- so the face has to follow the script rather than the
+ * other way round.  Unlike the desktop build there is no per-word fallback here:
+ * a custom typeface draws what it has and nothing else, which is why
+ * `arabicOnly` refuses any string that mixes the two.
+ */
+private val Pixelify =
+    FontFamily(Font(com.eightd.music.R.font.pixelify_sans_bold, FontWeight.Bold))
+private val Methlama =
+    FontFamily(Font(com.eightd.music.R.font.ko_methlama_medium, FontWeight.Medium))
+
+/**
+ * True when the string is Arabic and nothing else.  Digits, spaces and the
+ * punctuation the interface uses are allowed through -- Methlama draws those --
+ * but one Latin letter is enough to send the whole string back to the body face.
+ */
+fun arabicOnly(text: String): Boolean {
+    var seen = false
+    for (c in text) {
+        if (c.code in 0x0600..0x06FF || c.code in 0x0750..0x077F ||
+            c.code in 0xFB50..0xFEFF) { seen = true; continue }
+        if (c.isLetter()) return false
+    }
+    return seen
+}
+
+/**
+ * The cover mark: a track's opening letters, set in the face that can draw them.
+ * Arabic sits shorter on the line than Latin at the same size, so it is given a
+ * fifth more.
+ */
+@Composable
+fun Mark(text: String, size: TextUnit, color: Color, modifier: Modifier = Modifier) {
+    val arabic = arabicOnly(text)
+    androidx.compose.material3.Text(
+        text = text,
+        color = color,
+        maxLines = 1,
+        // Trimmed and centred on the glyph band rather than on the line box:
+        // the two faces have very different vertical metrics, and the default
+        // padding would leave one of them sitting off the middle of the tile.
+        style = TextStyle(
+            fontSize = if (arabic) size * 1.05f else size,
+            fontWeight = if (arabic) FontWeight.Medium else FontWeight.Bold,
+            fontFamily = if (arabic) Methlama else Pixelify,
+            lineHeight = if (arabic) size * 1.05f else size,
+            lineHeightStyle = LineHeightStyle(
+                alignment = LineHeightStyle.Alignment.Center,
+                trim = LineHeightStyle.Trim.Both,
+            ),
+            platformStyle = PlatformTextStyle(includeFontPadding = false),
+        ),
+        modifier = modifier,
+    )
+}
+
 /** Body face for v2. The serif is kept for page titles only, as in the design. */
 @Composable
 fun T(
@@ -108,7 +170,9 @@ fun T(
     color = color,
     fontSize = size,
     fontWeight = weight,
-    fontFamily = FontFamily.SansSerif,
+    // Figtree's stand-in has no Arabic, so an Arabic title goes to Methlama
+    // rather than to whichever face the device happens to fall back on.
+    fontFamily = if (arabicOnly(text)) Methlama else FontFamily.SansSerif,
     letterSpacing = letterSpacing,
     textAlign = align,
     maxLines = maxLines,

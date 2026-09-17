@@ -68,22 +68,17 @@ Two artefacts: `8DMusicAPO.dll` (the effect) and `8DMusic.exe` (the window).
 
 ## Install
 
-**This is the hard part, and it is not solved by building.** Registering a
-custom APO against an audio endpoint takes more than `regsvr32`:
+`installer\inno\8DMusic.iss` builds `8DMusic-Setup.exe`, which does all of it:
+drops the DLL and the exe into `%ProgramFiles%\8DMusic`, registers the COM
+class, creates the shared block with a DACL audiodg can read, writes the CLSID
+into the chosen endpoint's `FxProperties`, and restarts. It keeps a backup of
+every value it touched in `install-backup.ini` so the uninstaller can put the
+machine back exactly as it found it.
 
-1. `regsvr32 8DMusicAPO.dll` — registers the COM class. Needs an elevated prompt.
-2. The endpoint must then be told to load it, by writing the CLSID into that
-   device's `FxProperties` under
-   `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render\{endpoint}`.
-3. Restart the audio service (or reboot) — `audiodg` only reads this at start.
-
-**Equalizer APO ships a whole device-installer utility for step 2**, and it is
-worth reading its approach before writing our own; the exact property keys vary
-by Windows version and getting them wrong silently does nothing.
-
-Until that installer exists, the DLL builds and registers but will not be in the
-audio path, and `8DMusic.exe` will honestly report `WAITING` rather than
-pretend otherwise.
+What has to be true for the APO to load at all is in `docs\APO-RESEARCH.md` --
+five separate conditions, and missing any one of them makes Windows skip the
+effect without logging anything anywhere. `docs\RECOVERY.md` is the way back if
+audio is broken and this window cannot be trusted.
 
 ## The window
 
@@ -92,8 +87,16 @@ the shared block and draws what the telemetry says the orbit is doing. Changing
 how it looks touches neither `src/apo` nor `src/shared`, which is why the
 interface could be replaced without going near the audio path.
 
-It is now the same page as the Linux build's v2 Studio — see
-`cpp/src/ui/Studio.cpp`, which `src/gui/Main.cpp` mirrors function for function:
+Three pages behind one title bar, as on Linux: **Studio**, **About** and
+**Account**, ported from `cpp/src/ui/Studio.cpp` and `cpp/src/ui/Pages.cpp`,
+which `src/gui/Main.cpp` mirrors function for function.
+
+About differs in two places, because the thing behind them does not exist here.
+The desktop build has a Presentations card that replays the welcome flow and the
+studio tour, and Windows has neither; and its first guide explains a PipeWire
+virtual sink, where this one has to explain an APO.
+
+Studio itself:
 
 * the orbit on a lit floor with its readout, the meters and the preset chips on
   the left;
@@ -106,8 +109,18 @@ It is now the same page as the Linux build's v2 Studio — see
   close at the trailing edge, and any empty part of the bar drags it.
 
 Where the Linux build has an ENGINE card with a Start button, Windows has
-ENDPOINT: there is nothing to start, only somewhere to be. It shows the output,
-whether the APO is in the path, and why not when it is not.
+ENDPOINT: there is nothing to start, only somewhere to be. It shows the default
+output, whether the APO is in the path, and why not when it is not.
+
+Two places where it deliberately does *not* follow the Linux build:
+
+* The output is a **readout, not a picker**. Linux can move its capture to
+  another sink; here the effect is an APO the installer attached to an endpoint,
+  and nothing in this build may change the user's output device. It was a
+  dropdown, and it was a lie -- the device refresh put the choice back two
+  seconds later.
+* The player has **no transport buttons**. It reports what the media session is
+  playing; it does not drive it.
 
 Three files carry the shared design rather than a copy of it:
 `cpp/src/ui/Theme.h` for the colours, `cpp/src/ui/Icons.h` for the glyphs (path
@@ -121,18 +134,69 @@ loads. Without it Segoe UI takes over and everything still lays out.
 
 ## Status
 
-Written, not yet compiled. There is no Windows machine, MSVC or Windows SDK on
-the development host, so unlike the Android and Linux builds — which were both
-tested on real hardware — none of this has been through a compiler. Expect
-build errors on the first pass.
+Working. The APO loads into `audiodg.exe`, processes, and the window reads its
+telemetry live. Parity with the Linux build is measured rather than claimed:
+`parity.ps1` renders the shared probe on both and compares -- correlation
+1.000000, largest sample difference 0.000006, which is the same bar Android met.
 
-## The alternative worth considering
+The known gap: the effect registers into the SFX slot (`,5`), not EFX (`,7`).
+`,7` was tried with the working APO and does not load. The consequence is that
+each application gets its own instance, so two programs playing at once orbit
+independently rather than as one scene.
 
-A standalone `.exe` using WASAPI loopback needs no APO, no registry, no admin
-and no reboot: set a virtual cable as the default output, capture its loopback,
-process, and render to the real device. That is *exactly* the Linux
-architecture, it is perhaps 300 lines, and it can be tested the moment it
-compiles.
+## Testing the window
 
-The cost is that the user installs a virtual audio cable. The benefit is that
-it will actually work this week.
+`ui_probe.exe` drives a running `8DMusic.exe` through real window messages --
+clicks, drags, the wheel, the keyboard -- and after every action reads
+`%ProgramData%\8DMusic\state.bin` to check the field that control is wired to
+actually moved, by the amount it should have.
+
+```
+cmake --build build --config Release --target 8DMusic ui_probe
+build\Release\8DMusic.exe
+build\Release\ui_probe.exe          # fast: messages posted straight to the window
+build\Release\ui_probe.exe --real   # slow: drives the actual cursor
+```
+
+Run `--real` before believing a pass. The default mode posts into the client
+area, which skips `WM_NCHITTEST` -- and that is where the worst bug this window
+has had lived: every control in the title bar answered "caption", so clicking
+close, minimise or the 8D switch dragged the window instead of pressing it, and
+it was self-locking, because once Windows believes a point is caption it stops
+delivering `WM_MOUSEMOVE` there and nothing up there can ever become hot again.
+The harness passed the whole time. `--real` goes through SendInput, so
+hit-testing, hover, capture and double-click timing are all exercised the way a
+hand exercises them.
+
+It does not guess where anything is. The window writes down the rectangle it
+painted for every control and the harness clicks those, so a layout change moves
+the test with it and a control that stops being drawn fails as "not found"
+rather than passing because the click landed on background. Two hooks in
+`src/gui/Main.cpp` serve it and nothing else: `WM_APP+1` paints one frame
+synchronously, `WM_APP+2` writes the hit list.
+
+It covers all eight modes, the direction pill, all fifteen knobs -- turned by
+hand as well as by the wheel, including the ones that are meant to be inert
+(Speed under Static, Echo's Time and Feedback until Delay is raised) -- the
+Amount slider clicked and dragged, double-click reset, Shift for fine
+adjustment, every preset both as a chip and through the `+` list, the switches,
+the keyboard shortcuts, the window buttons, and that the title bar drags the
+window while the controls sitting in it do not.
+
+What it does not cover: any DPI but this machine's 100%, and the About and
+Account pages beyond checking that their tabs are clickable.
+
+## The now-playing bar
+
+It is drawn from three numbers the Windows media session reports: Position,
+PlaybackStatus and LastUpdatedTime. **Position is a reading, not a clock** —
+Chromium browsers take one and then stop updating it. Brave sat at 68.33 s for
+three minutes of a playing track while LastUpdatedTime aged past 195 s.
+
+So the reading is dated with LastUpdatedTime and run forward from there. Stamping
+it with "now" on each poll, which is the obvious thing to do, restarts the
+extrapolation twice a second and freezes the bar at whatever second the player
+last bothered to publish.
+
+`np_watch.exe [seconds]` prints those three columns once a second, which is how
+that was found rather than guessed at.

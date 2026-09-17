@@ -698,6 +698,7 @@ bool App::shoot(const std::string& outDir, std::string& error) {
     preset_ = 1;
     status_.clear();
 
+    int failed = 0;
     auto shot = [&](const char* name) {
         ui_.beginFrame();
         drawChrome(cr, w, h);
@@ -724,14 +725,41 @@ bool App::shoot(const std::string& outDir, std::string& error) {
         cairo_paint(ocr);
         cairo_surface_flush(out);
         const std::string path = outDir + "/" + name + ".png";
-        cairo_surface_write_to_png(out, path.c_str());
+        // Saying it wrote a file it did not write is worse than not writing it.
+        if (cairo_surface_write_to_png(out, path.c_str()) != CAIRO_STATUS_SUCCESS)
+            ++failed;
         cairo_destroy(ocr);
         cairo_surface_destroy(out);
         ui_.endFrame();
     };
 
+    // A track in the dock, so the cover mark and the metadata line can be read
+    // off the shot.  The second one is Arabic: the mark and the title change
+    // face with the script, and that is the part worth looking at.
+    auto pose = [&](const char* title, std::vector<std::string> artists,
+                    const char* player) {
+        Track t;
+        t.title = title;
+        t.artists = std::move(artists);
+        t.player = player;
+        t.playing = true;
+        t.length = 263;
+        t.position = 78;
+        // Stamped now, or `at()` would count the whole uptime as elapsed and
+        // the progress bar would sit at the end of every shot.
+        t.stamp = std::chrono::duration<double>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+        t.canPrev = t.canNext = t.canSeek = true;
+        t.bus = "org.mpris.MediaPlayer2.pose";
+        nowPlaying_.poseTrack(std::move(t));
+    };
+
     welcome_ = -1; tour_ = -1;
+    pose("Love The Way You Lie", {"Eminem", "Rihanna"}, "Spotify");
     page_ = Page::Studio;  shot("studio");
+    pose("الأطلال", {"أم كلثوم"}, "Spotify");
+    page_ = Page::Studio;  shot("studio-arabic");
+    pose("Love The Way You Lie", {"Eminem", "Rihanna"}, "Spotify");
     page_ = Page::About;   shot("about");
     page_ = Page::Account; shot("account");
     page_ = Page::Studio;
@@ -753,7 +781,11 @@ bool App::shoot(const std::string& outDir, std::string& error) {
     cairo_surface_destroy(surf);
     cairo_destroy(dcr);
     cairo_surface_destroy(desk);
-    (void)error;
+    if (failed) {
+        error = "could not write " + std::to_string(failed) + " file(s) into "
+              + outDir + " -- does the directory exist?";
+        return false;
+    }
     return true;
 }
 

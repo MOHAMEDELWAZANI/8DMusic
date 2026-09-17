@@ -101,6 +101,19 @@ target_link_libraries(8DMusic PRIVATE comctl32 advapi32 ole32 oleaut32 uuid
     user32 gdi32 shell32 gdiplus WindowsApp)
 set_target_properties(8DMusic PROPERTIES OUTPUT_NAME "8DMusic")
 
+# The typeface travels with the app, as it does on Linux. Copied beside the exe
+# so a build tree renders in Figtree without depending on where the repo sits;
+# the installer ships the same file into the install directory.
+set(FIGTREE ${CMAKE_CURRENT_SOURCE_DIR}/../cpp/assets/fonts/Figtree.ttf)
+if(EXISTS ${FIGTREE})
+    add_custom_command(TARGET 8DMusic POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${FIGTREE} $<TARGET_FILE_DIR:8DMusic>/Figtree.ttf)
+else()
+    message(WARNING "Figtree.ttf is missing from cpp/assets/fonts; the window "
+                    "will fall back to Segoe UI and will not match the design.")
+endif()
+
 # ----------------------------------------------------------------- the probe
 # The parity probe is the same source file the Linux and Android builds use.
 # Compiled in place from cpp/tests, for the same reason the DSP is: a Windows
@@ -129,3 +142,22 @@ add_executable(8dplay tools/8dplay.cpp ${DSP_DIR}/Processor.cpp)
 target_include_directories(8dplay PRIVATE ${DSP_DIR})
 target_link_libraries(8dplay PRIVATE ole32 oleaut32 uuid)
 set_target_properties(8dplay PROPERTIES OUTPUT_NAME "8dplay")
+
+# ------------------------------------------------------------ the UI harness
+# Drives a running 8DMusic.exe through real window messages and checks the
+# shared block after every action. It clicks the rectangles the window itself
+# reports, so it cannot pass against a stale copy of the layout.
+add_executable(ui_probe tools/ui_probe.cpp src/shared/SharedState.cpp)
+target_include_directories(ui_probe PRIVATE ${DSP_DIR} src)
+# The harness parses its own dump file; sscanf is the right tool and the _s
+# variants cannot read an unbounded line list any more safely here.
+target_compile_definitions(ui_probe PRIVATE _CRT_SECURE_NO_WARNINGS)
+target_link_libraries(ui_probe PRIVATE user32 advapi32)
+set_target_properties(ui_probe PROPERTIES OUTPUT_NAME "ui_probe")
+
+# ------------------------------------------------------- media session watch
+# Prints what GlobalSystemMediaTransportControlsSession reports over time, so a
+# stuck now-playing bar can be traced to the number that is actually wrong.
+add_executable(np_watch tools/np_watch.cpp)
+target_link_libraries(np_watch PRIVATE WindowsApp)
+set_target_properties(np_watch PROPERTIES OUTPUT_NAME "np_watch")

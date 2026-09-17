@@ -74,6 +74,11 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 ; the restart it is going to ask for anyway.
 Source: "..\..\build\Release\8DMusicAPO.dll"; DestDir: "{app}"; Flags: ignoreversion restartreplace uninsrestartdelete
 Source: "..\..\build\Release\8DMusic.exe";    DestDir: "{app}"; Flags: ignoreversion restartreplace uninsrestartdelete
+; The typeface travels with the app, as it does on Linux. Without it the window
+; falls back to Segoe UI and stops looking like the design. Nothing is installed
+; into the system font list -- 8DMusic.exe loads this file for its own process.
+Source: "..\..\..\cpp\assets\fonts\Figtree.ttf"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\..\cpp\assets\fonts\OFL.txt";     DestDir: "{app}"; DestName: "Figtree-LICENCE.txt"; Flags: ignoreversion
 Source: "README.txt";                          DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]

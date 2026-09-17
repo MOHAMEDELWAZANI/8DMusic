@@ -471,7 +471,7 @@ fun NowPlayingBlock(
         ) {
             // Initials only for a real track: lettering a status message reads
             // as an album called "Al".
-            if (coverLabel != null) T(coverLabel, 28.sp, p.dim, FontWeight.Bold)
+            if (coverLabel != null) Mark(coverLabel, 28.sp, p.dim)
             else Canvas(Modifier.size(28.dp)) {
                 drawLine(
                     p.ghost, Offset(0f, size.height / 2), Offset(size.width, size.height / 2),

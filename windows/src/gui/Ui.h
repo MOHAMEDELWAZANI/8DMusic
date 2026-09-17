@@ -40,6 +40,10 @@ enum class Align { Left, Centre, Right };
 enum Weight { W400 = 400, W500 = 500, W600 = 600, W700 = 700, W800 = 800 };
 
 inline constexpr double kPill = 999;       // "radius: 999px"
+
+// Rows inside an open dropdown are recorded under this offset, so the probe can
+// tell "the Output menu's third entry" from the control that opened it.
+inline constexpr int kMenuRow = 900000;
 inline constexpr double kPiUi = 3.14159265358979323846;
 
 inline Gdiplus::Color gp(const Rgb& c, double alpha = 1.0) {
@@ -71,13 +75,29 @@ public:
     int hot = 0, active = 0, openMenu = 0;
     double dragA = 0, dragV = 0;     // the angle a knob turn is at, and its value
     float dpi = 1.0f;
+    double viewW = 0, viewH = 0;     // the client area, so a menu can stay inside it
 
-    void begin(HDC dc, Gdiplus::Graphics* g) { dc_ = dc; g_ = g; }
+    // Every control records where it was drawn.  Nothing in the interface reads
+    // this -- `tools/ui_probe.cpp` does, so the test harness clicks what the
+    // window actually painted rather than a second copy of the layout maths
+    // that could drift away from it.
+    struct Hit { int id; Rect r; };
+    std::vector<Hit> hits;
+
+    // A full pass: the hit list is rebuilt from what this frame paints.
+    void begin(HDC dc, Gdiplus::Graphics* g) {
+        dc_ = dc; g_ = g; hits.clear();
+    }
+    // A live-only pass, drawing the handful of things that move on top of the
+    // cached frame.  It must not clear the hit list -- nothing is laid out here
+    // and WM_NCHITTEST still has to be able to answer from the last full pass.
+    void use(HDC dc, Gdiplus::Graphics* g) { dc_ = dc; g_ = g; }
     void endFrame() {
         mousePressed = mouseReleased = doubleClick = false;
         wheel = 0;
         if (!mouseDown) active = 0;
     }
+    void note(int id, const Rect& r) { hits.push_back({ id, r }); }
 
     double s(double v) const { return v * dpi; }
 
@@ -97,6 +117,15 @@ public:
         if (!r.contains(mouseX, mouseY)) { mouseX = -1e6; mouseY = -1e6; }
         clipped_ = true;
     }
+    // A shape clip for painting alone -- no text goes inside one, so this does
+    // not need GDI's clip or the pointer push that pushClip does.
+    void pushClipShape(const Rect& r, double rad) {
+        Gdiplus::GraphicsPath p;
+        roundPath(p, r, rad);
+        g_->SetClip(&p, Gdiplus::CombineModeReplace);
+    }
+    void popClipShape() { g_->ResetClip(); }
+
     void popClip() {
         if (!clipped_) return;
         g_->ResetClip();
@@ -188,17 +217,36 @@ public:
     // A filled disc lit from a point inside it -- the orbit's floor.  GDI+'s
     // path gradient is its radial fill; the centre may sit off-centre, which is
     // what makes the stage read as lit from above.
+    //
+    // Three stops, as the cairo build has: without the middle one the floor
+    // falls off to the rim in a straight ramp and the stage loses its shape.
+    // A path gradient's blend runs from the boundary (0) inwards to the centre
+    // (1), which is the other way round from cairo's radial stops.
     void discGradient(double cx, double cy, double r, double lightY,
-                      const Rgb& centre, const Rgb& edge) {
+                      const Rgb& centre, const Rgb& middle, const Rgb& edge) {
         Gdiplus::GraphicsPath p;
         p.AddEllipse(Gdiplus::RectF(float(cx - r), float(cy - r),
                                     float(r * 2), float(r * 2)));
         Gdiplus::PathGradientBrush b(&p);
         b.SetCenterPoint(Gdiplus::PointF(float(cx), float(lightY)));
-        b.SetCenterColor(gp(centre));
-        Gdiplus::Color rim = gp(edge);
-        int count = 1;
-        b.SetSurroundColors(&rim, &count);
+        const Gdiplus::Color cols[3] = { gp(edge), gp(middle), gp(centre) };
+        const Gdiplus::REAL pos[3] = { 0.0f, 0.25f, 1.0f };
+        if (b.SetInterpolationColors(cols, pos, 3) != Gdiplus::Ok) {
+            b.SetCenterColor(gp(centre));
+            Gdiplus::Color rim = gp(edge);
+            int count = 1;
+            b.SetSurroundColors(&rim, &count);
+        }
+        g_->FillPath(&b, &p);
+    }
+
+    // One filled path from the design's own SVG, in its own view box.
+    void fillSvg(const char* d, const Rect& box, double viewBox, const Rgb& c,
+                 double a = 1.0) {
+        Gdiplus::GraphicsPath p;
+        p.SetFillMode(Gdiplus::FillModeWinding);
+        SvgPath::add(p, d, box.x, box.y, box.w, viewBox);
+        Gdiplus::SolidBrush b(gp(c, a));
         g_->FillPath(&b, &p);
     }
 
@@ -287,6 +335,127 @@ public:
         return t + L"…";
     }
 
+    // Wrapped body copy, laid out word by word.
+    //
+    // The cairo build hands this to Pango, which shapes, wraps and applies
+    // markup in one call. GDI has DrawTextW, which wraps but will not change
+    // weight mid-paragraph -- and every bullet on the About page leads with a
+    // bold phrase and continues in the body weight. So the words are measured
+    // and placed here instead: `<b>` and `</b>` switch weight, nothing else is
+    // interpreted, and `draw = false` measures without painting.
+    double flow(double x, double y, double width, const std::wstring& text_,
+                const Rgb& c, double lineH = 1.5, bool draw = true,
+                Align align = Align::Left) {
+        const double size = fontSize_;
+        const int base = fontWeight_;
+        struct Word { std::wstring s; bool bold; double w; };
+        std::vector<Word> words;
+        bool bold = false;
+        std::wstring cur;
+        auto flush = [&] {
+            if (cur.empty()) return;
+            font(size, bold ? W700 : base);
+            words.push_back({ cur, bold, textWidth(cur) });
+            cur.clear();
+        };
+        for (size_t i = 0; i < text_.size();) {
+            if (text_.compare(i, 3, L"<b>") == 0)  { flush(); bold = true;  i += 3; continue; }
+            if (text_.compare(i, 4, L"</b>") == 0) { flush(); bold = false; i += 4; continue; }
+            if (text_[i] == L' ' || text_[i] == L'\n') { flush(); ++i; continue; }
+            cur += text_[i++];
+        }
+        flush();
+
+        font(size, base);
+        const double space = textWidth(L" ");
+        const double lh = s(size * lineH);
+        double cy = y, lineW = 0;
+        size_t start = 0;
+
+        auto emit = [&](size_t from, size_t to, double w) {
+            if (!draw) return;
+            double px = x;
+            if (align == Align::Centre) px = x + (width - w) * 0.5;
+            else if (align == Align::Right) px = x + width - w;
+            for (size_t i = from; i < to; ++i) {
+                font(size, words[i].bold ? W700 : base);
+                text(px, cy + lh * 0.5, words[i].s, c);
+                px += words[i].w + space;
+            }
+        };
+
+        for (size_t i = 0; i < words.size(); ++i) {
+            const double add = (i > start ? space : 0) + words[i].w;
+            if (lineW + add > width && i > start) {
+                emit(start, i, lineW);
+                cy += lh;
+                start = i;
+                lineW = words[i].w;
+            } else {
+                lineW += add;
+            }
+        }
+        if (start < words.size()) { emit(start, words.size(), lineW); cy += lh; }
+        font(size, base);
+        return cy - y;
+    }
+    double flowHeight(double width, const std::wstring& t, double lineH = 1.5) {
+        return flow(0, 0, width, t, theme.text, lineH, false);
+    }
+
+    // A row in a list: glyph in a tinted tile, title, subtitle, chevron.
+    bool listRow(int id, const Rect& r, const Icon& glyph, const Rgb& glyphColour,
+                 const Rgb& glyphBg, const std::wstring& title,
+                 const std::wstring& sub, const Icon& trail) {
+        const bool clicked = click(id, r);
+        if (over(r)) fillRound(r.inset(-s(4)), s(14), theme.text, 0.04);
+        const Rect ib{ r.x, r.cy() - s(19), s(38), s(38) };
+        fillRound(ib, s(13), glyphBg);
+        icon(glyph, { ib.x + s(9.5), ib.y + s(9.5), s(19), s(19) }, glyphColour);
+        const double tx = ib.x + ib.w + s(13);
+        font(13.5, W600);
+        text(tx, r.cy() - (sub.empty() ? 0 : s(9)), fit(title, r.w - (tx - r.x) - s(28)),
+             theme.text);
+        if (!sub.empty()) {
+            font(11.5, W400);
+            text(tx, r.cy() + s(10), fit(sub, r.w - (tx - r.x) - s(28)), theme.faint);
+        }
+        icon(trail, { r.x + r.w - s(16), r.cy() - s(8), s(16), s(16) }, theme.ghost);
+        return clicked;
+    }
+
+    // Neither GDI+ nor cairo blurs, so a drop shadow is a stack of rounded
+    // rectangles fading outwards. At these sizes the banding is invisible.
+    void shadow(const Rect& r, double rad, double spread, double alpha,
+                double dy = 0) {
+        for (int i = 12; i >= 1; --i) {
+            const double t = double(i) / 12.0, g = spread * t;
+            fillRound({ r.x - g, r.y - g + dy, r.w + g * 2, r.h + g * 2 },
+                      rad + g, Rgb{ 0, 0, 0 }, alpha * (1 - t) * (1 - t) * 0.30);
+        }
+    }
+
+    // A diagonal wash inside a rounded card -- the Support panel on About.
+    //
+    // The gradient spans the whole shape and fades out at `stop`, rather than
+    // ending early and letting GDI+ wrap. A LinearGradientBrush tiles by
+    // default: ending it at 72% of the width made the wash reappear at full
+    // strength along the last quarter of the card, as a hard magenta band.
+    void linearRound(const Rect& r, double rad, const Rgb& c,
+                     double a0, double a1, double stop = 0.72) {
+        Gdiplus::GraphicsPath p;
+        roundPath(p, r, rad);
+        Gdiplus::LinearGradientBrush b(
+            Gdiplus::PointF(float(r.x), float(r.y)),
+            Gdiplus::PointF(float(r.x + r.w), float(r.y + r.h)),
+            gp(c, a0), gp(c, a1));
+        b.SetWrapMode(Gdiplus::WrapModeClamp);
+        const Gdiplus::Color cols[3] = { gp(c, a0), gp(c, a1), gp(c, a1) };
+        const Gdiplus::REAL pos[3] = { 0.0f, float(stop), 1.0f };
+        b.SetInterpolationColors(cols, pos, 3);
+        g_->FillPath(&b, &p);
+    }
+
     // ---------------------------------------------------------------- icons
     void icon(const Icon& ic, const Rect& box, const Rgb& colour,
               double alpha = 1.0, bool dashed = false) {
@@ -347,6 +516,7 @@ public:
 
     // Was this rectangle clicked?  Shared by everything below.
     bool click(int id, const Rect& r, bool enabled = true) {
+        note(id, r);
         const bool o = enabled && r.contains(mouseX, mouseY);
         if (o) hot = id;
         if (o && mousePressed) active = id;
@@ -465,6 +635,7 @@ public:
 
         // hit area: the dial plus its caption, so the grab is forgiving
         const Rect grab{ cx - sz * 0.5 - s(4), box.y - s(4), sz + s(8), sz + s(26) };
+        note(id, grab);
         const bool hov = enabled && grab.contains(mouseX, mouseY);
         if (hov) hot = id;
         bool changed = false;
@@ -539,7 +710,13 @@ public:
 
         // The head of the line: where the value has reached, and what the hand
         // goes for.
-        const double head = (from + sweep) * kPiUi / 180.0;
+        //
+        // It follows the value along the whole track -- 135 degrees plus the
+        // fraction of 270 -- not the end of the fill. For a tone control turned
+        // *down* the fill runs anticlockwise from twelve o'clock, so its end is
+        // twelve o'clock, and reading the head off it left the dot stranded at
+        // the top while the arc swept away underneath it.
+        const double head = (135.0 + 270.0 * t) * kPiUi / 180.0;
         const double hx = cx + std::cos(head) * rad, hy = cy + std::sin(head) * rad;
         if (enabled) circle(hx, hy, sw * 0.5 + s(5), theme.accent, 0.22);
         circle(hx, hy, sw * 0.5 + s(2.5), theme.accent, alpha);
@@ -557,6 +734,7 @@ public:
                 bool enabled = true, double step = 0.01) {
         const Rect grab{ track.x - s(8), track.y - s(12),
                          track.w + s(16), track.h + s(24) };
+        note(id, grab);
         const bool hov = enabled && grab.contains(mouseX, mouseY);
         if (hov) hot = id;
         if (hov && mousePressed) active = id;
@@ -595,6 +773,7 @@ public:
     // Draws the closed control; the list is drawn later by `menuPopup`.
     bool dropdown(int id, const Rect& r, const std::wstring& value,
                   bool enabled = true) {
+        note(id, r);
         const bool hov = enabled && r.contains(mouseX, mouseY);
         if (hov) hot = id;
         if (hov && mousePressed) openMenu = (openMenu == id) ? 0 : id;
@@ -622,6 +801,22 @@ public:
         const double h = rowH * double(items.size()) + s(10);
         Rect box{ anchor.x, anchor.y + anchor.h + s(6), w, h };
 
+        // Ten presets is taller than the space under the button that opens
+        // them, so a list that would fall off the bottom opens upwards instead
+        // -- otherwise the last few are drawn outside the window and cannot be
+        // reached at all.
+        if (viewH > 0 && box.y + h > viewH - s(8))
+            box.y = std::max(s(8), anchor.y - h - s(6));
+        if (viewW > 0 && box.x + w > viewW - s(8))
+            box.x = std::max(s(8), viewW - s(8) - w);
+
+        // Cairo has no blur and neither has GDI+ here, so the drop is a stack
+        // of rounded rectangles fading outwards; at this size it reads as soft.
+        for (int i = 12; i >= 1; --i) {
+            const double t = double(i) / 12.0, g = s(16) * t;
+            fillRound({ box.x - g, box.y - g + s(6), box.w + g * 2, box.h + g * 2 },
+                      s(16) + g, Rgb{ 0, 0, 0 }, 0.5 * (1 - t) * (1 - t) * 0.30);
+        }
         fillRound(box, s(16), theme.card);
         strokeRound(box, s(16), theme.line, 1, 0.8);
 
@@ -629,6 +824,7 @@ public:
         for (size_t i = 0; i < items.size(); ++i) {
             const Rect row{ box.x + s(5), box.y + s(5) + rowH * double(i),
                             box.w - s(10), rowH };
+            note(kMenuRow + id * 100 + int(i), row);
             const bool hov = row.contains(mouseX, mouseY);
             if (hov) fillRound(row, s(10), theme.well);
             font(12.5, int(i) == current ? W700 : W500);

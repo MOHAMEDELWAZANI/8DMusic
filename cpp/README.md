@@ -144,6 +144,17 @@ with the app in `assets/fonts/` and is registered with fontconfig for this
 process only — nothing is installed. Without it the app falls back to whatever
 sans the system has.
 
+Two more faces travel with it, for the now-playing cover mark: **Pixelify Sans
+Bold** (SIL OFL, cut from the variable original at weight 700) for Latin
+initials and **KO Methlama Medium** for Arabic ones. They cover disjoint
+alphabets — Pixelify has all 52 Latin letters and no Arabic, Methlama 112
+Arabic letters and no Latin — so `Ui::mark` names both in one family list and
+Pango picks per run: the face follows the title without anything having to work
+out which script it is in. Methlama is also in `Ui::sans`, after the Latin
+faces, so an Arabic title in the dock is set in it rather than in whatever
+fontconfig would otherwise reach for. `assets/fonts/NOTICE.txt` says what each
+file is licensed for; all three may be bundled and redistributed.
+
 ## Controls
 
 Movement (mode, direction, speed, distance, intensity, smoothness) · Space
